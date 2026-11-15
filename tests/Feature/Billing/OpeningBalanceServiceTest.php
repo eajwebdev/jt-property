@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Billing;
 
+use App\Enums\AccountStatus;
 use App\Enums\LedgerEntryType;
 use App\Models\ActivityLog;
 use App\Models\BillingAccount;
@@ -176,8 +177,19 @@ class OpeningBalanceServiceTest extends TestCase
 
         $this->assertSame('reversed', $ob->refresh()->status);
         $this->assertSame(0, LedgerEntry::count());
+        $this->assertTrue(ActivityLog::where('action', 'opening_balance.cancelled')->exists());
+        $this->assertFalse(ActivityLog::where('action', 'opening_balance.reversed')->exists());
         $this->draft(); // account is free again
         $this->assertSame(2, OpeningBalance::count());
+    }
+
+    public function test_a_closed_account_can_carry_an_opening_balance(): void
+    {
+        $closed = BillingAccount::factory()->create(['status' => AccountStatus::Closed]);
+
+        $this->service->approve($this->draft($closed));
+
+        $this->assertSame(180000, app(ReceivableLedgerService::class)->balance($closed));
     }
 
     public function test_a_reversed_balance_cannot_be_approved(): void

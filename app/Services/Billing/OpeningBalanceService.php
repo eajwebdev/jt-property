@@ -106,7 +106,7 @@ class OpeningBalanceService
 
             $was = $row->status;
             $row->update(['status' => 'reversed', 'reversed_at' => now(), 'reverse_reason' => $reason]);
-            Audit::log('opening_balance.reversed', $row, ['was' => $was, 'reason' => $reason, 'amount_cents' => $row->amount_cents]);
+            Audit::log($was === 'pending' ? 'opening_balance.cancelled' : 'opening_balance.reversed', $row, ['was' => $was, 'reason' => $reason, 'amount_cents' => $row->amount_cents]);
         });
         $ob->refresh();
     }

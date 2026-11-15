@@ -278,7 +278,14 @@ export default function OpeningBalancesIndex({ accounts, properties, filters, ca
                                 {accounts.map((r) => (
                                     <tr key={r.account_id} className="border-t">
                                         <td className="p-3 font-medium whitespace-nowrap">{r.account_no}</td>
-                                        <td className="p-3">{r.tenant}</td>
+                                        <td className="p-3">
+                                            {r.tenant}
+                                            {r.account_status === 'closed' && (
+                                                <Badge variant="outline" className="ml-2">
+                                                    Closed account
+                                                </Badge>
+                                            )}
+                                        </td>
                                         <td className="p-3">{r.property}</td>
                                         <td className="p-3">
                                             <Badge variant={statusVariant[r.status]}>{statusLabels[r.status]}</Badge>

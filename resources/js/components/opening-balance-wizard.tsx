@@ -1,5 +1,6 @@
-﻿import InputError from '@/components/input-error';
+import InputError from '@/components/input-error';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,7 @@ export interface WizardAccount {
     account_no: string;
     tenant: string;
     first_charge_date: string | null;
+    account_status: string;
 }
 
 type Line = { month: string; amount: string; note: string };
@@ -163,7 +165,7 @@ export function OpeningBalanceWizard({ account, today, onClose }: { account: Wiz
                     </div>
                 )}
 
-                {step === 2 && cents && (
+                {step === 2 && cents !== null && (
                     <div className="space-y-4">
                         <p className="rounded-lg border p-4 text-sm">
                             This will post <strong>{formatCents(cents)}</strong> as Balance Brought Forward on <strong>{account.account_no}</strong>.
@@ -172,6 +174,7 @@ export function OpeningBalanceWizard({ account, today, onClose }: { account: Wiz
                         <p className="text-muted-foreground text-sm">
                             Owed as of {form.data.as_of}.{lines.length > 0 && ` ${lines.length} month(s) listed.`}
                         </p>
+                        {account.account_status === 'closed' && <Badge variant="secondary">Closed account</Badge>}
                         {hasEarlierBills && (
                             <Alert>
                                 <TriangleAlert />
@@ -181,6 +184,8 @@ export function OpeningBalanceWizard({ account, today, onClose }: { account: Wiz
                             </Alert>
                         )}
                         <InputError message={errors.billing_account_id} />
+                        <InputError message={errors.amount} />
+                        <InputError message={errors.notes} />
                         <InputError message={errors.opening_balance} />
                         <InputError message={errors.as_of} />
                         <InputError message={errors.breakdown} />
