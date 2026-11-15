@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\PropertyController;
+use App\Http\Controllers\UnitController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -10,6 +12,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
+
+    Route::resource('properties', PropertyController::class)->except('destroy');
+    Route::resource('properties.units', UnitController::class)->shallow()->only(['store', 'update']);
 });
 
 require __DIR__.'/settings.php';

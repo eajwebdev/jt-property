@@ -63,7 +63,15 @@ class Unit extends Model
             return $this->status->value;
         }
 
-        $occupied = $this->occupiedCountOn($date ?? today());
+        return $this->displayStatusFor($this->occupiedCountOn($date ?? today()));
+    }
+
+    /** Same as displayStatus() when the occupied count is already known (avoids a query per unit in lists). */
+    public function displayStatusFor(int $occupied): string
+    {
+        if ($this->status !== UnitStatus::Available) {
+            return $this->status->value;
+        }
 
         return match (true) {
             $occupied >= $this->capacity => 'full',

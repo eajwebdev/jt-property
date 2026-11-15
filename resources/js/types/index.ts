@@ -29,6 +29,42 @@ export interface SharedData {
     [key: string]: unknown;
 }
 
+export interface PropertySummary {
+    id: number;
+    name: string;
+    code: string;
+    type: string;
+    address: string;
+    rooms: number;
+    capacity: number;
+    occupied: number;
+    vacant: number;
+}
+
+export interface PropertyDetail {
+    id: number;
+    name: string;
+    code: string;
+    type: string;
+    address: string;
+    description: string | null;
+    amenities: string | null;
+}
+
+export interface UnitRow {
+    id: number;
+    code: string;
+    building: string | null;
+    floor: string | null;
+    capacity: number;
+    rent_mode: 'whole' | 'per_bed';
+    status: 'available' | 'maintenance' | 'unavailable';
+    description: string | null;
+    occupied: number;
+    display_status: string;
+    occupants: { id: number; name: string; bed: string | null }[];
+}
+
 export interface User {
     id: number;
     name: string;
