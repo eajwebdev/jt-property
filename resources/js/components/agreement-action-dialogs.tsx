@@ -18,12 +18,20 @@ export interface ActionAgreement {
     end_date: string | null;
     whole: boolean;
     current_rent_cents: number | null;
+    first_rent_cents?: number | null;
 }
 
 interface BaseProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     today: string;
+}
+
+/** Rent now, or for a rental that has not started yet, its first scheduled rent. */
+function rentText(a: ActionAgreement): string {
+    if (a.current_rent_cents !== null) return formatCents(a.current_rent_cents);
+    if (a.first_rent_cents != null) return `Starts ${formatDate(a.start_date)}: ${formatCents(a.first_rent_cents)}`;
+    return '-';
 }
 
 /** Adds days to a YYYY-MM-DD date without timezone drift. */
@@ -195,7 +203,7 @@ export function ChangeRentDialog({ agreement, open, onOpenChange, today }: BaseP
             onSave={() => f.save(route('agreements.rent.store', agreement.id), () => onOpenChange(false))}
             summary={[
                 ['Room', agreement.room],
-                ['Current rent', agreement.current_rent_cents === null ? '-' : formatCents(agreement.current_rent_cents)],
+                ['Current rent', rentText(agreement)],
                 ['New rent', <span className="font-semibold">{cents ? formatCents(cents) : f.data.rent}</span>],
                 ['Takes effect on', formatDate(f.data.effective_from)],
                 ['Reason', f.data.reason],
@@ -203,8 +211,7 @@ export function ChangeRentDialog({ agreement, open, onOpenChange, today }: BaseP
         >
             <p className="text-sm">
                 Current rent:{' '}
-                <span className="font-semibold">{agreement.current_rent_cents === null ? '-' : formatCents(agreement.current_rent_cents)}</span> a
-                month
+                <span className="font-semibold">{rentText(agreement)}</span>{agreement.current_rent_cents !== null && ' a month'}
             </p>
             <div className="grid gap-2">
                 <Label htmlFor="change-rent">New monthly rent (pesos)</Label>

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import { formatCents } from '@/lib/money';
 import { agreementStatusLabels, deliveryLabels, depositStatusLabels, formatDate } from '@/lib/tenant-labels';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -30,6 +31,7 @@ interface Agreement {
     whole: boolean;
     replaced: boolean;
     current_rent_cents: number | null;
+    first_rent_cents: number | null;
     rates: Rate[];
     recurring_charges: { id: number; label: string; amount: string; start_date: string; end_date: string | null }[];
 }
@@ -62,7 +64,7 @@ interface Props {
         archived_at: string | null;
     };
     accounts: Account[];
-    occupancies: { id: number; room: string; move_in_date: string; move_out_date: string | null; is_payer: boolean; open: boolean }[];
+    occupancies: { id: number; room: string; move_in_date: string; move_out_date: string | null; is_payer: boolean; replaced: boolean; open: boolean }[];
     canEdit: boolean;
     canArchive: boolean;
     canStartRental: boolean;
@@ -208,6 +210,11 @@ export default function Show({
                                                 From {formatDate(a.start_date)}
                                                 {a.end_date && ` to ${formatDate(a.end_date)}`}, due on day {a.due_day} of the month
                                             </p>
+                                            {a.current_rent_cents === null && a.first_rent_cents != null && (
+                                                <p className="text-sm">
+                                                    Starts {formatDate(a.start_date)}: <span className="font-medium">{formatCents(a.first_rent_cents)}</span> a month
+                                                </p>
+                                            )}
                                             {a.replaced && (
                                                 <p className="text-muted-foreground text-sm">
                                                     Moved to another room. Changes are made on the new rental.
@@ -320,7 +327,7 @@ export default function Show({
                                     <span className="text-muted-foreground">
                                         {formatDate(o.move_in_date)} to {o.move_out_date ? formatDate(o.move_out_date) : 'now'}
                                     </span>
-                                    {canManageRentals && o.open && !o.is_payer && (
+                                    {canManageRentals && o.open && !o.is_payer && !o.replaced && (
                                         <Button
                                             variant="outline"
                                             size="sm"

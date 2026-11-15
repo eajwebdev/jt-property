@@ -212,6 +212,8 @@ class TenancyService
             Tenant::lockForUpdate()->findOrFail($occupancy->tenant_id);
             $occupancy = Occupancy::with('rentalAgreement')->lockForUpdate()->findOrFail($occupancy->id);
             $agreement = $occupancy->rentalAgreement;
+            // The agreement row is not locked on purpose: a resident leaving never changes rent, dates or billing,
+            // and the unit lock above already serialises every flow that does.
             $this->guardNotTransferred($agreement);
             $last = $date->toDateString();
             $current = $occupancy->move_out_date?->toDateString();
