@@ -3,7 +3,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { Building2, LayoutGrid, Receipt, Users } from 'lucide-react';
+import { Building2, History, LayoutGrid, Receipt, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -26,6 +26,11 @@ const mainNavItems: NavItem[] = [
         title: 'Charges & Utilities',
         url: '/charges',
         icon: Receipt,
+    },
+    {
+        title: 'Opening Balances',
+        url: '/opening-balances',
+        icon: History,
     },
 ];
 
