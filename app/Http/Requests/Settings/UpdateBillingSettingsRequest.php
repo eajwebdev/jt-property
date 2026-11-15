@@ -43,7 +43,15 @@ class UpdateBillingSettingsRequest extends FormRequest
             'reminder_days_after' => ['required', 'integer', 'between:0,60'],
             'late_fee_policy' => ['required', Rule::in(['none', 'fixed', 'percent'])],
             'late_fee_value' => $percent
-                ? ['required', 'regex:/^\d{1,3}(\.\d{1,2})?$/', fn ($a, $v, $fail) => Money::toCents((string) $v) > 10000 ? $fail('The late fee percentage can be at most 100.') : null]
+                ? ['bail', 'required', 'regex:/^\d{1,3}(\.\d{1,2})?$/', function ($a, $v, $fail) {
+                    try {
+                        if (Money::toCents((string) $v) > 10000) {
+                            $fail('The late fee percentage can be at most 100.');
+                        }
+                    } catch (InvalidArgumentException) {
+                        $fail('Enter a percentage like 2 or 2.5, up to 100.');
+                    }
+                }]
                 : ['nullable', new Pesos('late fee amount', allowZero: true)],
             'late_fee_grace_days' => ['required', 'integer', 'between:0,60'],
         ];
@@ -77,6 +85,13 @@ class UpdateBillingSettingsRequest extends FormRequest
             'method' => $r['method'], 'label' => $r['label'], 'account_name' => $r['account_name'],
             'account_number' => $r['account_number'], 'notes' => $r['notes'] ?? '',
         ], array_values($data['payment_instructions']));
+
+        foreach (['generate_lead_days', 'reminder_days_before', 'reminder_days_after', 'late_fee_grace_days'] as $k) {
+            $data[$k] = (int) $data[$k];
+        }
+        foreach (['auto_send_email', 'auto_generate', 'reminder_on_due'] as $k) {
+            $data[$k] = $this->boolean($k);
+        }
 
         foreach (['company_address', 'company_phone', 'company_email', 'statement_notes'] as $k) {
             $data[$k] ??= '';

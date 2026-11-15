@@ -4,9 +4,12 @@ namespace Tests\Feature\Settings;
 
 use App\Enums\Role;
 use App\Models\ActivityLog;
+use App\Models\AppSetting;
 use App\Models\User;
 use App\Support\Settings;
+use Illuminate\Contracts\Queue\Job;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Queue\Events\JobProcessing;
 use Inertia\Testing\AssertableInertia as Assert;
 use InvalidArgumentException;
 use Tests\TestCase;
@@ -168,5 +171,32 @@ class BillingSettingsTest extends TestCase
     public function test_unknown_keys_are_rejected(): void
     {
         $this->actingAs($this->user(Role::Owner))->put('/settings/billing', $this->payload(['sneaky' => 1]))->assertSessionHasErrors('sneaky');
+    }
+
+    public function test_cache_is_cleared_when_a_queue_job_starts(): void
+    {
+        $this->assertSame('JT Property Management', Settings::get('company_name'));
+        AppSetting::create(['key' => 'company_name', 'value' => 'Changed']);
+
+        event(new JobProcessing('sync', $this->createMock(Job::class)));
+
+        $this->assertSame('Changed', Settings::get('company_name'));
+    }
+
+    public function test_percent_policy_with_text_is_a_validation_error(): void
+    {
+        $this->actingAs($this->user(Role::Owner))->put('/settings/billing', $this->payload(['late_fee_policy' => 'percent', 'late_fee_value' => 'abc']))->assertSessionHasErrors('late_fee_value');
+    }
+
+    public function test_numbers_and_switches_are_stored_with_real_types(): void
+    {
+        $this->actingAs($this->user(Role::Owner))->put('/settings/billing', $this->payload(['generate_lead_days' => '5', 'reminder_days_before' => '2', 'reminder_days_after' => '4', 'late_fee_grace_days' => '2', 'auto_send_email' => '1', 'reminder_on_due' => '0']))->assertSessionHasNoErrors();
+
+        $this->assertSame(5, Settings::get('generate_lead_days'));
+        $this->assertSame(2, Settings::get('reminder_days_before'));
+        $this->assertSame(4, Settings::get('reminder_days_after'));
+        $this->assertSame(2, Settings::get('late_fee_grace_days'));
+        $this->assertTrue(Settings::get('auto_send_email'));
+        $this->assertFalse(Settings::get('reminder_on_due'));
     }
 }

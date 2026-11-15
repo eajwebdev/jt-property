@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\AppSetting;
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use InvalidArgumentException;
 
 /**
@@ -64,8 +65,16 @@ class Settings
         }
 
         $old = self::get($key);
-        $setting = AppSetting::firstOrNew(['key' => $key]);
-        $setting->fill(['value' => $value, 'updated_by' => $by->id])->save();
+        $attributes = ['value' => $value, 'updated_by' => $by->id];
+
+        try {
+            $setting = AppSetting::firstOrNew(['key' => $key]);
+            $setting->fill($attributes)->save();
+        } catch (UniqueConstraintViolationException) {
+            // A concurrent first save created the row; update it instead.
+            $setting = AppSetting::where('key', $key)->firstOrFail();
+            $setting->fill($attributes)->save();
+        }
         self::forget();
 
         Audit::log('settings.updated', $setting, ['key' => $key, 'old' => $old, 'new' => $value]);
