@@ -29,9 +29,10 @@ class TenantPolicy
         return $user->role === Role::Staff && ($propertyId === null || $user->canAccessProperty($propertyId));
     }
 
+    /** Archived tenants are read-only. */
     public function update(User $user, Tenant $tenant): bool
     {
-        return $this->create($user, $tenant->property_id);
+        return $tenant->archived_at === null && $this->create($user, $tenant->property_id);
     }
 
     public function archive(User $user, Tenant $tenant): bool

@@ -74,7 +74,8 @@ export interface TenantRow {
     room: string | null;
     rent: string | null;
     due_day: number | null;
-    status: 'active' | 'no_room' | 'archived';
+    status: 'active' | 'upcoming' | 'no_room' | 'archived';
+    moving_in: string | null;
 }
 
 export interface Paginated<T> {

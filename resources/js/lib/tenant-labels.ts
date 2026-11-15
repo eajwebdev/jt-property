@@ -1,6 +1,7 @@
 export const statusFilterLabels: Record<string, string> = {
     active: 'Living here now',
     no_email: 'No email address',
+    upcoming: 'Moving in soon',
     vacated: 'Moved out',
     archived: 'Archived',
 };

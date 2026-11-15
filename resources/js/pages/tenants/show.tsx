@@ -91,7 +91,7 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                     <div className="space-y-1">
                         <h1 className="text-2xl font-semibold tracking-tight">{tenant.full_name}</h1>
                         <p className="text-sm text-muted-foreground">{tenant.property}</p>
-                        {tenant.archived_at && <TenantStatusBadge status="archived" />}
+                        {tenant.archived_at && <TenantStatusBadge status="archived" date={tenant.archived_at} />}
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {canEdit && (

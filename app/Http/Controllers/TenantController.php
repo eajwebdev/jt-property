@@ -49,7 +49,8 @@ class TenantController extends Controller
             ->when($status === 'archived', fn ($query) => $query->whereNotNull('archived_at'), fn ($query) => $query->whereNull('archived_at'))
             ->when($status === 'no_email', fn ($query) => $query->whereNull('email'))
             ->when($status === 'active', fn ($query) => $query->whereHas('occupancies', fn ($o) => $o->activeOn($today)))
-            ->when($status === 'vacated', fn ($query) => $query->whereHas('occupancies')->whereDoesntHave('occupancies', fn ($o) => $o->activeOn($today)))
+            ->when($status === 'upcoming', fn ($query) => $query->whereHas('occupancies', fn ($o) => $o->where('move_in_date', '>', $today->toDateString()))->whereDoesntHave('occupancies', fn ($o) => $o->activeOn($today)))
+            ->when($status === 'vacated', fn ($query) => $query->whereHas('occupancies', fn ($o) => $o->where('move_out_date', '<', $today->toDateString()))->whereDoesntHave('occupancies', fn ($o) => $o->currentOrFuture()))
             ->orderBy('full_name')
             ->paginate(25)
             ->withQueryString();
@@ -63,6 +64,13 @@ class TenantController extends Controller
             ->get()
             ->groupBy('tenant_id');
 
+        $upcoming = Occupancy::query()
+            ->where('move_in_date', '>', $today->toDateString())
+            ->whereIn('tenant_id', $tenants->pluck('id'))
+            ->orderBy('move_in_date')
+            ->get()
+            ->groupBy('tenant_id');
+
         $rents = RentRate::query()
             ->whereIn('rental_agreement_id', $occupancies->flatten()->pluck('rental_agreement_id')->filter()->unique())
             ->where('effective_from', '<=', $today->toDateString())
@@ -71,8 +79,9 @@ class TenantController extends Controller
             ->groupBy('rental_agreement_id')
             ->map(fn ($rates) => $rates->last()->rent_cents);
 
-        $tenants->through(function (Tenant $tenant) use ($occupancies, $rents) {
+        $tenants->through(function (Tenant $tenant) use ($occupancies, $rents, $upcoming) {
             $current = $occupancies->get($tenant->id)?->first();
+            $next = $upcoming->get($tenant->id)?->first();
             $rent = $current?->rental_agreement_id ? $rents->get($current->rental_agreement_id) : null;
 
             return [
@@ -84,7 +93,8 @@ class TenantController extends Controller
                 'room' => $current ? $current->unit->code.($current->bed ? ' / '.$current->bed->label : '') : null,
                 'rent' => $rent === null ? null : Money::format($rent),
                 'due_day' => $current?->rentalAgreement?->due_day,
-                'status' => $tenant->archived_at ? 'archived' : ($current ? 'active' : 'no_room'),
+                'status' => $tenant->archived_at ? 'archived' : ($current ? 'active' : ($next ? 'upcoming' : 'no_room')),
+                'moving_in' => $current || $tenant->archived_at ? null : $next?->move_in_date->toDateString(),
             ];
         });
 

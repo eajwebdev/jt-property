@@ -179,7 +179,7 @@ export default function Index({ tenants, filters, properties, canCreate }: Props
                                             <td className="px-3 py-2">{t.due_day ?? '-'}</td>
                                             <td className="px-3 py-2">{t.email ?? <NoEmailBadge />}</td>
                                             <td className="px-3 py-2">
-                                                <TenantStatusBadge status={t.status} />
+                                                <TenantStatusBadge status={t.status} date={t.moving_in} />
                                             </td>
                                         </tr>
                                     ))}
@@ -194,7 +194,7 @@ export default function Index({ tenants, filters, properties, canCreate }: Props
                                         <Link href={route('tenants.show', t.id)} className="font-medium after:absolute after:inset-0 focus-visible:outline-none">
                                             {t.name}
                                         </Link>
-                                        <TenantStatusBadge status={t.status} />
+                                        <TenantStatusBadge status={t.status} date={t.moving_in} />
                                     </div>
                                     <p className="text-sm text-muted-foreground">
                                         {t.property}

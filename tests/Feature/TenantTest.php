@@ -258,6 +258,38 @@ class TenantTest extends TestCase
                 ->has('accounts.0.deposits', 1)->has('occupancies', 1));
     }
 
+    public function test_archived_tenant_is_read_only(): void
+    {
+        $property = Property::factory()->create();
+        $tenant = Tenant::factory()->for($property)->create(['archived_at' => now()]);
+        $owner = User::factory()->owner()->create();
+
+        $this->actingAs($owner)->get(route('tenants.edit', $tenant))->assertForbidden();
+        $this->actingAs($owner)->put(route('tenants.update', $tenant), $this->payload($property))->assertForbidden();
+        $this->actingAs($owner)->patch(route('tenants.archive', $tenant))->assertForbidden();
+        $this->assertSame(0, ActivityLog::where('action', 'tenant.archived')->count());
+        $this->actingAs($owner)->get(route('tenants.show', $tenant))
+            ->assertInertia(fn (Assert $page) => $page->where('canEdit', false)->where('canArchive', false));
+    }
+
+    public function test_future_only_tenant_is_upcoming_not_vacated(): void
+    {
+        $property = Property::factory()->create();
+        $future = Tenant::factory()->for($property)->create();
+        Occupancy::factory()->for($future)->create(['move_in_date' => today()->addDays(10)->toDateString()]);
+        $ended = Tenant::factory()->for($property)->create();
+        Occupancy::factory()->for($ended)->create(['move_out_date' => '2026-02-01']);
+        $owner = User::factory()->owner()->create();
+
+        $ids = fn (array $q) => collect($this->actingAs($owner)->get(route('tenants.index', $q))->viewData('page')['props']['tenants']['data'])->pluck('id')->all();
+
+        $this->assertSame([$future->id], $ids(['status' => 'upcoming']));
+        $this->assertSame([$ended->id], $ids(['status' => 'vacated']));
+        $this->actingAs($owner)->get(route('tenants.index', ['status' => 'upcoming']))
+            ->assertInertia(fn (Assert $page) => $page->where('tenants.data.0.status', 'upcoming')
+                ->where('tenants.data.0.moving_in', today()->addDays(10)->toDateString()));
+    }
+
     public function test_no_destroy_route_exists(): void
     {
         $this->assertFalse(Route::has('tenants.destroy'));
