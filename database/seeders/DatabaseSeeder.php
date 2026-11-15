@@ -38,5 +38,9 @@ class DatabaseSeeder extends Seeder
                 'email_verified_at' => now(),
             ]);
         }
+
+        if (app()->environment('local', 'testing')) {
+            $this->call(DemoSeeder::class);
+        }
     }
 }
