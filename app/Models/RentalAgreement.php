@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\AgreementStatus;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -55,6 +56,15 @@ class RentalAgreement extends Model
     public function occupancies(): HasMany
     {
         return $this->hasMany(Occupancy::class);
+    }
+
+    /** Agreements running on the date: start <= date <= end (inclusive, open end = forever). Never trust status alone. */
+    public function scopeActiveOn(Builder $query, CarbonInterface|string $date): Builder
+    {
+        $date = Carbon::parse($date)->toDateString();
+
+        return $query->where('start_date', '<=', $date)
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $date));
     }
 
     public function isWholeUnit(): bool

@@ -1,3 +1,4 @@
+import { ChangeRentDialog, MoveOutDialog, RecordDepositDialog, TransferDialog } from '@/components/agreement-action-dialogs';
 import StartRentalDialog, { type RentalOptions } from '@/components/start-rental-dialog';
 import TenantStatusBadge, { NoEmailBadge } from '@/components/tenant-status-badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -8,7 +9,7 @@ import AppLayout from '@/layouts/app-layout';
 import { agreementStatusLabels, deliveryLabels, depositStatusLabels, formatDate } from '@/lib/tenant-labels';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { KeyRound, Pencil } from 'lucide-react';
+import { ArrowRightLeft, Banknote, DoorOpen, KeyRound, Pencil, PiggyBank } from 'lucide-react';
 import { useState } from 'react';
 
 interface Rate {
@@ -24,6 +25,9 @@ interface Agreement {
     start_date: string;
     end_date: string | null;
     status: string;
+    open: boolean;
+    whole: boolean;
+    current_rent_cents: number | null;
     rates: Rate[];
 }
 interface Deposit {
@@ -60,7 +64,11 @@ interface Props {
     canArchive: boolean;
     canStartRental: boolean;
     rentalOptions: RentalOptions | null;
+    canManageRentals: boolean;
+    today: string;
 }
+
+type Action = { kind: 'rent' | 'move' | 'transfer'; agreement: Agreement } | { kind: 'deposit'; account: Account };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
@@ -71,8 +79,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     );
 }
 
-export default function Show({ tenant, accounts, occupancies, canEdit, canArchive, canStartRental, rentalOptions }: Props) {
+export default function Show({ tenant, accounts, occupancies, canEdit, canArchive, canStartRental, rentalOptions, canManageRentals, today }: Props) {
     const [rentalOpen, setRentalOpen] = useState(false);
+    // The last chosen action stays mounted while the dialog closes so its exit animation can play.
+    const [action, setAction] = useState<Action | null>(null);
+    const [actionOpen, setActionOpen] = useState(false);
+    const openAction = (a: Action) => {
+        setAction(a);
+        setActionOpen(true);
+    };
     const { flash } = usePage<SharedData>().props;
     const errors = usePage().props.errors as Record<string, string>;
 
@@ -176,6 +191,25 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                                                 From {formatDate(a.start_date)}
                                                 {a.end_date && ` to ${formatDate(a.end_date)}`}, due on day {a.due_day} of the month
                                             </p>
+                                            {canManageRentals && a.open && (
+                                                <div className="flex flex-wrap gap-2">
+                                                    <Button variant="outline" size="sm" onClick={() => openAction({ kind: 'rent', agreement: a })}>
+                                                        <Banknote /> Change rent
+                                                    </Button>
+                                                    {rentalOptions && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => openAction({ kind: 'transfer', agreement: a })}
+                                                        >
+                                                            <ArrowRightLeft /> Transfer
+                                                        </Button>
+                                                    )}
+                                                    <Button variant="outline" size="sm" onClick={() => openAction({ kind: 'move', agreement: a })}>
+                                                        <DoorOpen /> Move out
+                                                    </Button>
+                                                </div>
+                                            )}
                                             <table className="w-full text-sm">
                                                 <caption className="sr-only">Rent history for room {a.room}</caption>
                                                 <thead className="text-muted-foreground text-left">
@@ -204,7 +238,14 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                                         </div>
                                     ))}
                                     <div>
-                                        <h3 className="mb-1 text-sm font-medium">Deposits</h3>
+                                        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                                            <h3 className="text-sm font-medium">Deposits</h3>
+                                            {canManageRentals && (
+                                                <Button variant="outline" size="sm" onClick={() => openAction({ kind: 'deposit', account })}>
+                                                    <PiggyBank /> Record deposit
+                                                </Button>
+                                            )}
+                                        </div>
                                         {account.deposits.length === 0 ? (
                                             <p className="text-muted-foreground text-sm">No deposit recorded</p>
                                         ) : (
@@ -255,6 +296,26 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                     options={rentalOptions}
                     open={rentalOpen}
                     onOpenChange={setRentalOpen}
+                />
+            )}
+
+            {canManageRentals && action?.kind === 'rent' && (
+                <ChangeRentDialog agreement={action.agreement} open={actionOpen} onOpenChange={setActionOpen} today={today} />
+            )}
+            {canManageRentals && action?.kind === 'move' && (
+                <MoveOutDialog agreement={action.agreement} open={actionOpen} onOpenChange={setActionOpen} today={today} />
+            )}
+            {canManageRentals && action?.kind === 'transfer' && rentalOptions && (
+                <TransferDialog agreement={action.agreement} options={rentalOptions} open={actionOpen} onOpenChange={setActionOpen} today={today} />
+            )}
+            {canManageRentals && action?.kind === 'deposit' && (
+                <RecordDepositDialog
+                    accountId={action.account.id}
+                    accountNo={action.account.account_no}
+                    agreements={action.account.agreements}
+                    open={actionOpen}
+                    onOpenChange={setActionOpen}
+                    today={today}
                 />
             )}
         </AppLayout>

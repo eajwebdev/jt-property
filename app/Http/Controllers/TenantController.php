@@ -135,6 +135,7 @@ class TenantController extends Controller
         Gate::authorize('view', $tenant);
 
         $tenant->load('property:id,name,archived_at');
+        $today = today()->toDateString();
 
         $accounts = $tenant->billingAccounts()
             ->with(['agreements.unit:id,code', 'agreements.bed:id,label', 'agreements.rentRates', 'deposits'])
@@ -150,7 +151,11 @@ class TenantController extends Controller
                     'due_day' => $a->due_day,
                     'start_date' => $a->start_date->toDateString(),
                     'end_date' => $a->end_date?->toDateString(),
-                    'status' => $a->status->value,
+                    // Dates decide: an end date in the past means ended even if the status column was not updated yet.
+                    'status' => $a->end_date !== null && $a->end_date->toDateString() < $today ? 'ended' : $a->status->value,
+                    'open' => $a->end_date === null || $a->end_date->toDateString() >= $today,
+                    'whole' => $a->bed_id === null,
+                    'current_rent_cents' => ($a->rentRates->sortBy('effective_from')->filter(fn ($r) => $r->effective_from->toDateString() <= $today)->last() ?? $a->rentRates->sortBy('effective_from')->first())?->rent_cents,
                     'rates' => $a->rentRates->sortByDesc('effective_from')->values()->map(fn ($r) => [
                         'id' => $r->id,
                         'rent' => Money::format($r->rent_cents),
@@ -193,6 +198,8 @@ class TenantController extends Controller
             'canArchive' => $user->can('archive', $tenant) && $tenant->archived_at === null,
             'canStartRental' => $canStartRental,
             'rentalOptions' => $canStartRental ? $this->rentalOptions($tenant) : null,
+            'canManageRentals' => $user->can('recordDeposit', RentalAgreement::class),
+            'today' => $today,
         ]);
     }
 

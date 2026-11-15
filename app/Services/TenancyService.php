@@ -4,12 +4,15 @@ namespace App\Services;
 
 use App\Enums\AccountStatus;
 use App\Enums\AgreementStatus;
+use App\Enums\DepositStatus;
 use App\Enums\RentMode;
 use App\Enums\UnitStatus;
 use App\Models\Bed;
 use App\Models\BillingAccount;
 use App\Models\Occupancy;
 use App\Models\RentalAgreement;
+use App\Models\RentRate;
+use App\Models\SecurityDeposit;
 use App\Models\Tenant;
 use App\Models\Unit;
 use App\Support\Audit;
@@ -31,78 +34,265 @@ class TenancyService
      */
     public function startAgreement(Tenant $payer, Unit $unit, ?Bed $bed, int $rentCents, int $dueDay, CarbonInterface $startDate, array $options = []): RentalAgreement
     {
-        return DB::transaction(function () use ($payer, $unit, $bed, $rentCents, $dueDay, $startDate, $options) {
-            $unit = Unit::with('property')->lockForUpdate()->findOrFail($unit->id);
-            $start = $startDate->toDateString();
-            $end = isset($options['end_date']) ? Carbon::parse($options['end_date'])->toDateString() : null;
-            $residentIds = array_values(array_unique(array_map('intval', $options['resident_tenant_ids'] ?? [])));
-            $override = trim((string) ($options['override_reason'] ?? '')) ?: null;
+        return DB::transaction(fn () => $this->open($payer, $unit, $bed, $rentCents, $dueDay, $startDate, $options));
+    }
 
-            // Lock the people too (fixed id order): stops the same tenant being placed in two rooms at once
-            // and two active billing accounts being created for one payer.
-            $payer = Tenant::whereIn('id', [$payer->id, ...$residentIds])->orderBy('id')->lockForUpdate()->get()->find($payer->id) ?? $payer;
+    /**
+     * The body of startAgreement, shared with transfer(); must run inside a transaction.
+     * $account forces the billing account (transfer); null finds or creates the payer's active one.
+     */
+    private function open(Tenant $payer, Unit $unit, ?Bed $bed, int $rentCents, int $dueDay, CarbonInterface $startDate, array $options, ?BillingAccount $account = null): RentalAgreement
+    {
+        $unit = Unit::with('property')->lockForUpdate()->findOrFail($unit->id);
+        $start = $startDate->toDateString();
+        $end = isset($options['end_date']) ? Carbon::parse($options['end_date'])->toDateString() : null;
+        $residentIds = array_values(array_unique(array_map('intval', $options['resident_tenant_ids'] ?? [])));
+        $override = trim((string) ($options['override_reason'] ?? '')) ?: null;
 
-            $errors = $this->ruleErrors($payer, $unit, $bed, $start, $end, $residentIds, $override);
-            if ($errors) {
-                throw ValidationException::withMessages($errors);
-            }
+        // Lock the people too (fixed id order): stops the same tenant being placed in two rooms at once
+        // and two active billing accounts being created for one payer.
+        $payer = Tenant::whereIn('id', [$payer->id, ...$residentIds])->orderBy('id')->lockForUpdate()->get()->find($payer->id) ?? $payer;
 
-            $account = $payer->billingAccounts()
-                ->where('property_id', $unit->property_id)
-                ->where('status', AccountStatus::Active)
-                ->orderBy('id')
-                ->first()
-                ?? BillingAccount::create(['property_id' => $unit->property_id, 'payer_tenant_id' => $payer->id, 'status' => AccountStatus::Active]);
+        $errors = $this->ruleErrors($payer, $unit, $bed, $start, $end, $residentIds, $override);
+        if ($errors) {
+            throw ValidationException::withMessages($errors);
+        }
 
-            $agreement = $account->agreements()->create([
+        $account ??= $payer->billingAccounts()
+            ->where('property_id', $unit->property_id)
+            ->where('status', AccountStatus::Active)
+            ->orderBy('id')
+            ->first()
+            ?? BillingAccount::create(['property_id' => $unit->property_id, 'payer_tenant_id' => $payer->id, 'status' => AccountStatus::Active]);
+
+        $agreement = $account->agreements()->create([
+            'unit_id' => $unit->id,
+            'bed_id' => $bed?->id,
+            'due_day' => $dueDay,
+            'cycle_start_day' => $options['cycle_start_day'] ?? 1,
+            'issue_lead_days' => $options['issue_lead_days'] ?? 7,
+            'prorate' => $options['prorate'] ?? false,
+            'start_date' => $start,
+            'end_date' => $end,
+            'status' => AgreementStatus::Active,
+            'override_reason' => $override,
+        ]);
+
+        $agreement->rentRates()->create(['rent_cents' => $rentCents, 'effective_from' => $start, 'created_by' => auth()->id()]);
+
+        foreach ([$payer->id, ...$residentIds] as $tenantId) {
+            $agreement->occupancies()->create([
+                'tenant_id' => $tenantId,
                 'unit_id' => $unit->id,
                 'bed_id' => $bed?->id,
+                'is_payer' => $tenantId === $payer->id,
+                'move_in_date' => $start,
+                'move_out_date' => $end,
+            ]);
+        }
+
+        $depositCents = $options['deposit_cents'] ?? null;
+        if ($depositCents) {
+            $account->deposits()->create(['rental_agreement_id' => $agreement->id, 'amount_cents' => $depositCents, 'received_on' => $start]);
+        }
+
+        Audit::log('agreement.created', $agreement, [
+            'new' => [
+                'payer_tenant_id' => $payer->id,
+                'billing_account_id' => $account->id,
+                'unit_id' => $unit->id,
+                'bed_id' => $bed?->id,
+                'rent_cents' => $rentCents,
                 'due_day' => $dueDay,
-                'cycle_start_day' => $options['cycle_start_day'] ?? 1,
-                'issue_lead_days' => $options['issue_lead_days'] ?? 7,
-                'prorate' => $options['prorate'] ?? false,
                 'start_date' => $start,
                 'end_date' => $end,
-                'status' => AgreementStatus::Active,
-                'override_reason' => $override,
-            ]);
+                'resident_tenant_ids' => $residentIds,
+                'deposit_cents' => $depositCents,
+            ],
+            'override_reason' => $override,
+        ]);
 
-            $agreement->rentRates()->create(['rent_cents' => $rentCents, 'effective_from' => $start, 'created_by' => auth()->id()]);
+        return $agreement;
+    }
 
-            foreach ([$payer->id, ...$residentIds] as $tenantId) {
-                $agreement->occupancies()->create([
-                    'tenant_id' => $tenantId,
-                    'unit_id' => $unit->id,
-                    'bed_id' => $bed?->id,
-                    'is_payer' => $tenantId === $payer->id,
-                    'move_in_date' => $start,
-                    'move_out_date' => $end,
-                ]);
+    /**
+     * Append a new rent rate from $effectiveFrom on. Existing rate rows are never edited,
+     * so bills for earlier dates keep their old amount.
+     */
+    public function changeRent(RentalAgreement $agreement, int $rentCents, CarbonInterface $effectiveFrom, string $reason): RentRate
+    {
+        return DB::transaction(function () use ($agreement, $rentCents, $effectiveFrom, $reason) {
+            $agreement = RentalAgreement::lockForUpdate()->findOrFail($agreement->id);
+            $from = $effectiveFrom->toDateString();
+
+            $error = match (true) {
+                $from < $agreement->start_date->toDateString() => 'The new rent cannot start before the rental starts ('.$agreement->start_date->toDateString().').',
+                $agreement->end_date !== null && $from > $agreement->end_date->toDateString() => 'The new rent cannot start after the rental ends ('.$agreement->end_date->toDateString().').',
+                $agreement->rentRates()->whereDate('effective_from', $from)->exists() => 'There is already a rent starting on this date. Pick another date.',
+                default => null,
+            };
+            if ($error) {
+                throw ValidationException::withMessages(['effective_from' => $error]);
             }
 
-            $depositCents = $options['deposit_cents'] ?? null;
-            if ($depositCents) {
-                $account->deposits()->create(['rental_agreement_id' => $agreement->id, 'amount_cents' => $depositCents, 'received_on' => $start]);
-            }
+            $old = $agreement->rentOn($from);
+            $rate = $agreement->rentRates()->create(['rent_cents' => $rentCents, 'effective_from' => $from, 'reason' => $reason, 'created_by' => auth()->id()]);
 
-            Audit::log('agreement.created', $agreement, [
-                'new' => [
-                    'payer_tenant_id' => $payer->id,
-                    'billing_account_id' => $account->id,
-                    'unit_id' => $unit->id,
-                    'bed_id' => $bed?->id,
-                    'rent_cents' => $rentCents,
-                    'due_day' => $dueDay,
-                    'start_date' => $start,
-                    'end_date' => $end,
-                    'resident_tenant_ids' => $residentIds,
-                    'deposit_cents' => $depositCents,
-                ],
-                'override_reason' => $override,
+            Audit::log('rent.changed', $agreement, [
+                'old' => ['rent_cents' => $old],
+                'new' => ['rent_cents' => $rentCents, 'effective_from' => $from],
+                'reason' => $reason,
             ]);
 
-            return $agreement;
+            return $rate;
         });
+    }
+
+    /**
+     * End the rental with $date as the last day lived in (inclusive); the room is free from the next day.
+     * The agreement stays active until that day passes. Closes the billing account if nothing else continues.
+     */
+    public function moveOut(RentalAgreement $agreement, CarbonInterface $date, ?string $reason = null): void
+    {
+        DB::transaction(function () use ($agreement, $date, $reason) {
+            Unit::lockForUpdate()->findOrFail($agreement->unit_id);
+            $agreement = RentalAgreement::lockForUpdate()->findOrFail($agreement->id);
+            $last = $date->toDateString();
+
+            $error = match (true) {
+                $last < $agreement->start_date->toDateString() => 'The move-out date cannot be before the rental starts ('.$agreement->start_date->toDateString().').',
+                $last > today()->addDays(365)->toDateString() => 'The move-out date must be within the next 12 months.',
+                default => $this->endError($agreement, $last),
+            };
+            if ($error) {
+                throw ValidationException::withMessages(['move_out_date' => $error]);
+            }
+
+            $old = ['end_date' => $agreement->end_date?->toDateString(), 'status' => $agreement->status->value];
+            $this->end($agreement, $last);
+
+            $account = BillingAccount::lockForUpdate()->findOrFail($agreement->billing_account_id);
+            $continues = $account->agreements()->whereKeyNot($agreement->id)
+                ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>', $last))
+                ->exists();
+            if (! $continues) {
+                $account->update(['status' => AccountStatus::Closed]);
+            }
+
+            Audit::log('agreement.moved_out', $agreement, [
+                'old' => $old,
+                'new' => ['end_date' => $last, 'status' => $agreement->status->value, 'account_closed' => ! $continues],
+                'reason' => $reason,
+            ]);
+        });
+    }
+
+    /**
+     * Move a rental to another room/bed from $date: the old agreement ends the day before, a new one for the
+     * same billing account starts on $date with the same settings and the given or current rent, and the
+     * residents move along. All of startAgreement's rules apply; any failure rolls everything back.
+     */
+    public function transfer(RentalAgreement $agreement, Unit $toUnit, ?Bed $toBed, CarbonInterface $date, ?int $newRentCents = null, ?string $reason = null): RentalAgreement
+    {
+        return DB::transaction(function () use ($agreement, $toUnit, $toBed, $date, $newRentCents, $reason) {
+            // Unit rows first (id order), then startAgreement's own locks re-take them in this transaction.
+            Unit::whereIn('id', [$agreement->unit_id, $toUnit->id])->orderBy('id')->lockForUpdate()->get();
+            $agreement = RentalAgreement::with('billingAccount.payer')->lockForUpdate()->findOrFail($agreement->id);
+            $start = $date->toDateString();
+            $last = $date->copy()->subDay()->toDateString();
+
+            $error = match (true) {
+                $last < $agreement->start_date->toDateString() => 'The move date must be after the first day of the current rental ('.$agreement->start_date->toDateString().').',
+                (int) $toUnit->id === (int) $agreement->unit_id && $toBed?->id == $agreement->bed_id => 'Choose a different room or bed.',
+                default => $this->endError($agreement, $last),
+            };
+            if ($error) {
+                throw ValidationException::withMessages(['transfer_date' => $error]);
+            }
+
+            $rentCents = $newRentCents ?? $agreement->rentOn($last);
+            $residentIds = $agreement->occupancies()->where('is_payer', false)
+                ->where(fn ($q) => $q->whereNull('move_out_date')->orWhere('move_out_date', '>', $last))
+                ->pluck('tenant_id')->all();
+            $plannedEnd = $agreement->end_date?->toDateString();
+
+            // End the old stay first so the people are free from $date for the shared start rules.
+            $this->end($agreement, $last);
+            // A future move-out may already have closed the account; the rental continues in the new room.
+            $agreement->billingAccount->update(['status' => AccountStatus::Active]);
+
+            $new = $this->open($agreement->billingAccount->payer, $toUnit, $toBed, $rentCents, $agreement->due_day, $date, [
+                'cycle_start_day' => $agreement->cycle_start_day,
+                'issue_lead_days' => $agreement->issue_lead_days,
+                'prorate' => $agreement->prorate,
+                'end_date' => $plannedEnd !== null && $plannedEnd >= $start ? $plannedEnd : null,
+                'resident_tenant_ids' => $residentIds,
+            ], $agreement->billingAccount);
+
+            Audit::log('agreement.transferred', $agreement, [
+                'old' => ['rental_agreement_id' => $agreement->id, 'unit_id' => $agreement->unit_id, 'bed_id' => $agreement->bed_id, 'end_date' => $last],
+                'new' => ['rental_agreement_id' => $new->id, 'unit_id' => $new->unit_id, 'bed_id' => $new->bed_id, 'start_date' => $start, 'rent_cents' => $rentCents],
+                'reason' => $reason,
+            ]);
+
+            return $new;
+        });
+    }
+
+    /** A security deposit is a liability record only: it never changes rent or any balance here. */
+    public function recordDeposit(BillingAccount $account, int $cents, CarbonInterface $receivedOn, ?RentalAgreement $agreement = null, ?string $notes = null): SecurityDeposit
+    {
+        $errors = array_filter([
+            'amount' => $cents <= 0 ? 'Enter a deposit above zero.' : null,
+            'received_on' => $receivedOn->toDateString() > today()->toDateString() ? 'The date received cannot be in the future.' : null,
+            'rental_agreement_id' => $agreement && (int) $agreement->billing_account_id !== (int) $account->id ? 'That rental belongs to a different account.' : null,
+        ]);
+        if ($errors) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return DB::transaction(function () use ($account, $cents, $receivedOn, $agreement, $notes) {
+            $deposit = $account->deposits()->create([
+                'rental_agreement_id' => $agreement?->id,
+                'amount_cents' => $cents,
+                'received_on' => $receivedOn->toDateString(),
+                'status' => DepositStatus::Held,
+                'notes' => $notes,
+            ]);
+
+            Audit::log('deposit.recorded', $deposit, [
+                'new' => ['billing_account_id' => $account->id, 'rental_agreement_id' => $agreement?->id, 'amount_cents' => $cents, 'received_on' => $receivedOn->toDateString()],
+                'reason' => $notes,
+            ]);
+
+            return $deposit;
+        });
+    }
+
+    /** Why the agreement cannot be given $last as its final day, if anything. Ending is only ever brought forward. */
+    private function endError(RentalAgreement $agreement, string $last): ?string
+    {
+        $end = $agreement->end_date?->toDateString();
+
+        return match (true) {
+            $end !== null && $end < today()->toDateString() => 'This rental has already ended.',
+            $end !== null && $last > $end => "This rental already ends on {$end}. Pick that date or earlier.",
+            default => null,
+        };
+    }
+
+    /** Set the inclusive last day on the agreement and on its stays that run past it. */
+    private function end(RentalAgreement $agreement, string $last): void
+    {
+        $agreement->update([
+            'end_date' => $last,
+            'status' => $last < today()->toDateString() ? AgreementStatus::Ended : AgreementStatus::Active,
+        ]);
+
+        $agreement->occupancies()
+            ->where('move_in_date', '<=', $last)
+            ->where(fn ($q) => $q->whereNull('move_out_date')->orWhere('move_out_date', '>', $last))
+            ->update(['move_out_date' => $last]);
     }
 
     /**
@@ -170,11 +360,13 @@ class TenancyService
         return $errors;
     }
 
-    /** Active agreements overlap when a.start <= b.end (or open) and b.start <= a.end (or open). */
+    /**
+     * Agreements overlap when a.start <= b.end (or open) and b.start <= a.end (or open).
+     * Dates decide, not the status column: an ended agreement always has its end_date set.
+     */
     private function hasOverlappingAgreement(Unit $unit, ?Bed $bed, string $start, ?string $end): bool
     {
         return $unit->agreements()
-            ->where('status', AgreementStatus::Active)
             ->when($end, fn ($q) => $q->where('start_date', '<=', $end))
             ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $start))
             // Whole-unit: any agreement conflicts. Per-bed: the same bed or a whole-unit agreement.
