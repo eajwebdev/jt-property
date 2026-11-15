@@ -9,6 +9,7 @@ use App\Enums\Role;
 use App\Models\BillingAccount;
 use App\Models\ChargeCategory;
 use App\Models\Invoice;
+use App\Models\InvoiceLineItem;
 use App\Models\OneTimeCharge;
 use App\Models\Property;
 use App\Models\RecurringCharge;
@@ -246,5 +247,106 @@ class BillingPreviewServiceTest extends TestCase
 
         $this->assertLessThanOrEqual(10 * 15, $twenty - $five);
         fwrite(STDERR, "\nQUERIES 5 agreements={$five} 20 agreements={$twenty}\n");
+    }
+
+    private function invoiceFor(RentalAgreement $a, array $overrides = []): Invoice
+    {
+        $invoice = Invoice::create(array_merge([
+            'billing_account_id' => $a->billing_account_id, 'rental_agreement_id' => $a->id, 'property_id' => $this->property->id,
+            'number' => 'N-'.uniqid(), 'period_start' => '2026-11-01', 'period_end' => '2026-11-30', 'issue_date' => '2026-10-29', 'due_date' => '2026-11-05',
+            'status' => InvoiceStatus::Finalized, 'current_charges_cents' => 123400, 'finalized_at' => now(),
+            'idempotency_key' => 'agreement:'.$a->id.':cycle:2026-11-01:'.uniqid(),
+        ], $overrides));
+        InvoiceLineItem::create(['invoice_id' => $invoice->id, 'sort' => 1, 'category' => 'rent', 'label' => 'Stored rent', 'amount_cents' => 123400]);
+
+        return $invoice;
+    }
+
+    public function test_previous_balance_excludes_the_cycles_own_invoice_charge(): void
+    {
+        $a = $this->agreement(350000);
+        $ledger = app(ReceivableLedgerService::class);
+        $ledger->post($a->billingAccount, LedgerEntryType::Opening, 180000, now()->setDate(2026, 10, 1), $a, 'Opening');
+        $invoice = $this->invoiceFor($a, ['status' => InvoiceStatus::Finalized]);
+        $charge = $ledger->post($a->billingAccount, LedgerEntryType::Charge, 123400, now()->setDate(2026, 10, 29), $a);
+        $charge->forceFill(['invoice_id' => $invoice->id])->saveQuietly();
+
+        $row = $this->row($this->service->preview(2026, 11), $a);
+
+        $this->assertSame(180000, $row->previousBalanceCents);
+    }
+
+    public function test_previous_balance_stays_when_the_invoice_was_voided_and_reversed(): void
+    {
+        $a = $this->agreement(350000);
+        $ledger = app(ReceivableLedgerService::class);
+        $ledger->post($a->billingAccount, LedgerEntryType::Opening, 180000, now()->setDate(2026, 10, 1), $a, 'Opening');
+        $invoice = $this->invoiceFor($a);
+        $charge = $ledger->post($a->billingAccount, LedgerEntryType::Charge, 123400, now()->setDate(2026, 10, 29), $a);
+        $charge->forceFill(['invoice_id' => $invoice->id])->saveQuietly();
+        $reversal = $ledger->reverse($charge, 'void');
+        $reversal->forceFill(['invoice_id' => $invoice->id])->saveQuietly();
+        $invoice->update(['status' => InvoiceStatus::Void, 'voided_at' => now()]);
+
+        $row = $this->row($this->service->preview(2026, 11), $a);
+
+        $this->assertSame(180000, $row->previousBalanceCents);
+        $this->assertSame('eligible', $row->status);
+    }
+
+    public function test_already_billed_row_returns_the_stored_invoice_not_a_recomputation(): void
+    {
+        $a = $this->agreement(350000);
+        $invoice = $this->invoiceFor($a, ['number' => 'RIV-202611-0001']);
+
+        $row = $this->row($this->service->preview(2026, 11), $a);
+
+        $this->assertSame('already_billed', $row->status);
+        $this->assertSame(123400, $row->currentChargesCents);
+        $this->assertSame('Stored rent', $row->lines[0]['label']);
+        $this->assertSame('RIV-202611-0001', $row->invoiceNumber);
+    }
+
+    public function test_account_level_charge_goes_to_the_lowest_id_agreement_with_a_cycle_this_month(): void
+    {
+        $old = $this->agreement(350000, ['end_date' => '2026-06-30']);
+        $first = $this->agreement(350000);
+        $second = RentalAgreement::factory()->for($first->billingAccount, 'billingAccount')->for($this->unit)->create(['start_date' => '2026-01-01']);
+        RentRate::create(['rental_agreement_id' => $second->id, 'rent_cents' => 100000, 'effective_from' => '2026-01-01']);
+        OneTimeCharge::create(['billing_account_id' => $first->billing_account_id, 'charge_category_id' => ChargeCategory::where('name', 'Repair')->value('id'), 'label' => 'Fix', 'kind' => 'charge', 'amount_cents' => 5000, 'bill_month' => '2026-11-01']);
+
+        $preview = $this->service->preview(2026, 11);
+
+        $this->assertSame($first->id, $this->service->accountChargeAgreementId($first->billingAccount, 2026, 11));
+        $this->assertSame(355000, $this->row($preview, $first)->currentChargesCents);
+        $this->assertSame(100000, $this->row($preview, $second)->currentChargesCents);
+    }
+
+    public function test_account_level_charge_in_a_transfer_month_goes_to_the_old_agreement(): void
+    {
+        $old = $this->agreement(350000, ['end_date' => '2026-11-14']);
+        $new = RentalAgreement::factory()->for($old->billingAccount, 'billingAccount')->for($this->unit)
+            ->create(['start_date' => '2026-11-15', 'replaces_agreement_id' => $old->id]);
+        RentRate::create(['rental_agreement_id' => $new->id, 'rent_cents' => 350000, 'effective_from' => '2026-11-15']);
+        OneTimeCharge::create(['billing_account_id' => $old->billing_account_id, 'charge_category_id' => ChargeCategory::where('name', 'Repair')->value('id'), 'label' => 'Fix', 'kind' => 'charge', 'amount_cents' => 5000, 'bill_month' => '2026-11-01']);
+
+        $preview = $this->service->preview(2026, 11);
+
+        $this->assertSame($old->id, $this->service->accountChargeAgreementId($old->billingAccount, 2026, 11));
+        $this->assertContains('one_time', array_column($this->row($preview, $old)->lines, 'category'));
+        $this->assertNotContains('one_time', array_column($this->row($preview, $new)->lines, 'category'));
+    }
+
+    public function test_summary_counts_a_shared_accounts_previous_balance_once(): void
+    {
+        $a = $this->agreement(350000);
+        $b = RentalAgreement::factory()->for($a->billingAccount, 'billingAccount')->for($this->unit)->create(['start_date' => '2026-01-01']);
+        RentRate::create(['rental_agreement_id' => $b->id, 'rent_cents' => 100000, 'effective_from' => '2026-01-01']);
+        app(ReceivableLedgerService::class)->post($a->billingAccount, LedgerEntryType::Opening, 180000, now()->setDate(2026, 10, 1), $a, 'Opening');
+
+        $summary = $this->service->preview(2026, 11)['summary'];
+
+        $this->assertSame(180000, $summary['total_previous_outstanding_cents']);
+        $this->assertSame(450000 + 180000, $summary['estimated_statement_total_cents']);
     }
 }

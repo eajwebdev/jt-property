@@ -4,6 +4,7 @@ namespace App\Services\Billing;
 
 use App\Enums\InvoiceStatus;
 use App\Enums\Role;
+use App\Models\BillingAccount;
 use App\Models\Invoice;
 use App\Models\RentalAgreement;
 use App\Models\User;
@@ -32,8 +33,11 @@ class BillingPreviewService
         $agreements = $this->agreements($year, $month, $propertyId, $agreementIds, $for);
 
         $cycles = $agreements->mapWithKeys(fn (RentalAgreement $a) => [$a->id => $this->cycles->cycleFor($a, $year, $month)])->filter();
-        $keys = $cycles->mapWithKeys(fn (BillingCycle $c, int $id) => [self::idempotencyKey($id, $c) => $id]);
-        $billed = Invoice::whereIn('idempotency_key', $keys->keys())->where('status', InvoiceStatus::Finalized)->pluck('idempotency_key')->flip();
+        // Every invoice (any status) of these agreements for their cycle: finalized ones make the row
+        // already_billed; all of them are left out of the previous balance so a bill never counts itself.
+        $invoices = Invoice::with('lineItems')->whereIn('rental_agreement_id', $cycles->keys())->get()
+            ->filter(fn (Invoice $i) => $cycles->get($i->rental_agreement_id)?->periodStart->toDateString() === $i->period_start->toDateString())
+            ->groupBy('rental_agreement_id');
 
         $rows = [];
         foreach ($agreements as $a) {
@@ -42,18 +46,26 @@ class BillingPreviewService
                 continue;
             }
 
-            $built = $this->linesForAgreement($a, $cycle);
-            $flags = $built['flags'];
-            $current = array_sum(array_column($built['lines'], 'amount_cents'));
-            $previous = $this->ledger->balance($a->billingAccount, $cycle->periodStart->subDay());
+            $own = $invoices->get($a->id, collect());
+            $stored = $own->first(fn (Invoice $i) => $i->status === InvoiceStatus::Finalized);
+            $previous = $this->ledger->previousBalance($a->billingAccount, $cycle->periodStart, $own->pluck('id')->all());
+
+            if ($stored !== null) {
+                $lines = $stored->lineItems->map(fn ($l) => $this->line($l->category, $l->label, $l->description, $l->amount_cents, null, $l->qty_e3, $l->unit_rate_e4))->all();
+                $current = $stored->current_charges_cents;
+                $flags = ['existing_invoice'];
+                $review = false;
+            } else {
+                $built = $this->linesForAgreement($a, $cycle);
+                $lines = $built['lines'];
+                $current = array_sum(array_column($lines, 'amount_cents'));
+                $flags = $built['flags'];
+                $review = $built['needs_review'];
+            }
 
             $email = $a->billingAccount->payer?->email;
             if ($email === null || trim($email) === '') {
                 $flags[] = 'no_email';
-            }
-            $isBilled = $billed->has(self::idempotencyKey($a->id, $cycle));
-            if ($isBilled) {
-                $flags[] = 'existing_invoice';
             }
 
             $rows[] = new PreviewRow(
@@ -67,12 +79,13 @@ class BillingPreviewService
                 periodEnd: $cycle->periodEnd->toDateString(),
                 issueDate: $cycle->issueDate->toDateString(),
                 dueDate: $cycle->dueDate->toDateString(),
-                lines: $built['lines'],
+                lines: $lines,
                 currentChargesCents: $current,
                 previousBalanceCents: $previous,
                 estimatedTotalCents: $previous + $current,
-                status: $isBilled ? 'already_billed' : ($built['needs_review'] ? 'needs_review' : 'eligible'),
+                status: $stored !== null ? 'already_billed' : ($review ? 'needs_review' : 'eligible'),
                 flags: $flags,
+                invoiceNumber: $stored?->number,
             );
         }
 
@@ -123,14 +136,25 @@ class BillingPreviewService
 
         $month = $cycle->periodStart;
         $account = $agreement->billingAccount;
-        $first = $account->agreements->min('id') === $agreement->id;
+        $owner = $this->accountChargeAgreementId($account, $month->year, $month->month);
         foreach ($this->oneTime->pendingFor($account, $month->year, $month->month) as $c) {
-            if ($c->rental_agreement_id === $agreement->id || ($c->rental_agreement_id === null && $first)) {
+            if ($c->rental_agreement_id === $agreement->id || ($c->rental_agreement_id === null && $owner === $agreement->id)) {
                 $lines[] = $this->line('one_time', $c->label, null, $c->signed_cents, $c);
             }
         }
 
         return ['lines' => $lines, 'flags' => $flags, 'needs_review' => $flags !== []];
+    }
+
+    /**
+     * The agreement that carries an account's one-time charges not tied to an agreement: the lowest-id
+     * agreement of the account with a cycle in this month, whatever the preview filters. In a transfer
+     * month that is the old agreement (it was created first), so the charge is billed once, on it.
+     */
+    public function accountChargeAgreementId(BillingAccount $account, int $year, int $month): ?int
+    {
+        return RentalAgreement::where('billing_account_id', $account->id)->orderBy('id')->get()
+            ->first(fn (RentalAgreement $a) => $this->cycles->cycleFor($a, $year, $month) !== null)?->id;
     }
 
     private function line(string $category, string $label, ?string $description, int $cents, mixed $source, ?int $qty = null, ?int $rate = null): array
@@ -168,7 +192,8 @@ class BillingPreviewService
         }
 
         $new = array_sum(array_map(fn ($r) => $r->currentChargesCents, $rows));
-        $previous = array_sum(array_map(fn ($r) => $r->previousBalanceCents, $rows));
+        // Rows of one billing account share one balance; count it once.
+        $previous = array_sum(array_column(array_map(fn ($r) => ['a' => $r->accountId, 'p' => $r->previousBalanceCents], $rows), 'p', 'a'));
 
         return [
             'counts' => $counts,

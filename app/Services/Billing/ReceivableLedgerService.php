@@ -57,6 +57,20 @@ class ReceivableLedgerService
             ->sum('amount_cents');
     }
 
+    /**
+     * Balance before a statement period: entries effective before $periodStart, leaving out every entry
+     * (charge and any reversal) that belongs to the listed invoices, so a bill never counts itself.
+     *
+     * @param  list<int>  $excludeInvoiceIds
+     */
+    public function previousBalance(BillingAccount $acc, CarbonInterface $periodStart, array $excludeInvoiceIds = []): int
+    {
+        return (int) LedgerEntry::where('billing_account_id', $acc->id)
+            ->where('effective_date', '<', $periodStart->toDateString())
+            ->when($excludeInvoiceIds !== [], fn ($q) => $q->where(fn ($q) => $q->whereNull('invoice_id')->orWhereNotIn('invoice_id', $excludeInvoiceIds)))
+            ->sum('amount_cents');
+    }
+
     /** Post the negated amount, linked by reverses_id. An entry can be reversed once; a reversal cannot be reversed. */
     public function reverse(LedgerEntry $e, string $reason): LedgerEntry
     {

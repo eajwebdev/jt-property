@@ -26,5 +26,6 @@ final readonly class PreviewRow
         public int $estimatedTotalCents,
         public string $status,
         public array $flags,
+        public ?string $invoiceNumber = null,
     ) {}
 }
