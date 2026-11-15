@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\StoreUserRequest;
 use App\Http\Requests\Settings\UpdateUserRequest;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -38,7 +40,16 @@ class UserController extends Controller
     {
         Gate::authorize('update', $user);
 
-        $user->update($request->validated());
+        DB::transaction(function () use ($request, $user) {
+            $this->lockActiveOwners();
+            $user->refresh();
+
+            if ($user->isOwner() && $user->isActive() && $request->validated('role') !== Role::Owner->value && ! User::hasOtherActiveOwner($user)) {
+                throw ValidationException::withMessages(['role' => 'There must be at least one active owner.']);
+            }
+
+            $user->update($request->validated());
+        });
 
         return back()->with('success', "{$user->name} was updated.");
     }
@@ -51,11 +62,16 @@ class UserController extends Controller
             throw ValidationException::withMessages(['user' => 'You cannot deactivate your own account.']);
         }
 
-        if ($user->isOwner() && $user->isActive() && ! User::hasOtherActiveOwner($user)) {
-            throw ValidationException::withMessages(['user' => 'There must be at least one active owner.']);
-        }
+        DB::transaction(function () use ($user) {
+            $this->lockActiveOwners();
+            $user->refresh();
 
-        $user->forceFill(['deactivated_at' => now()])->save();
+            if ($user->isOwner() && $user->isActive() && ! User::hasOtherActiveOwner($user)) {
+                throw ValidationException::withMessages(['user' => 'There must be at least one active owner.']);
+            }
+
+            $user->forceFill(['deactivated_at' => now()])->save();
+        });
 
         return back()->with('success', "{$user->name} was deactivated and can no longer sign in.");
     }
@@ -67,5 +83,13 @@ class UserController extends Controller
         $user->forceFill(['deactivated_at' => null])->save();
 
         return back()->with('success', "{$user->name} can sign in again.");
+    }
+
+    /**
+     * Serialise last-owner checks: concurrent demotions/deactivations queue on these row locks.
+     */
+    private function lockActiveOwners(): void
+    {
+        User::where('role', Role::Owner)->whereNull('deactivated_at')->lockForUpdate()->get();
     }
 }

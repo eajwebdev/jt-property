@@ -41,7 +41,7 @@ function UserActions({ user, isSelf }: { user: ListedUser; isSelf: boolean }) {
     }
 
     if (isSelf) {
-        return null;
+        return <span className="text-xs text-muted-foreground">You</span>;
     }
 
     return (
@@ -66,6 +66,45 @@ function UserActions({ user, isSelf }: { user: ListedUser; isSelf: boolean }) {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+function RoleCell({ user, isSelf }: { user: ListedUser; isSelf: boolean }) {
+    const [pending, setPending] = useState<Role | null>(null);
+
+    const confirm = () => {
+        if (!pending) return;
+        router.patch(route('users.update', user.id), { name: user.name, role: pending }, { preserveScroll: true, onFinish: () => setPending(null) });
+    };
+
+    return (
+        <div className="grid gap-1">
+            <Select value={user.role} onValueChange={(role) => setPending(role as Role)} disabled={isSelf}>
+                <SelectTrigger className="h-8 w-32" aria-label={`Role for ${user.name}`}>
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="owner">Owner</SelectItem>
+                    <SelectItem value="staff">Staff</SelectItem>
+                    <SelectItem value="accountant">Accountant</SelectItem>
+                </SelectContent>
+            </Select>
+            {isSelf && <p className="text-xs text-muted-foreground">Ask another owner to change your role.</p>}
+            <Dialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Change {user.name}'s role?</DialogTitle>
+                        <DialogDescription>{pending && roleHelp[pending]}</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="secondary">Cancel</Button>
+                        </DialogClose>
+                        <Button onClick={confirm}>Change role</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
     );
 }
 
@@ -125,21 +164,7 @@ export default function Users({ users }: { users: ListedUser[] }) {
                                         <td className="px-3 py-2">{user.name}</td>
                                         <td className="px-3 py-2">{user.email}</td>
                                         <td className="px-3 py-2">
-                                            <Select
-                                                value={user.role}
-                                                onValueChange={(role) =>
-                                                    router.patch(route('users.update', user.id), { name: user.name, role }, { preserveScroll: true })
-                                                }
-                                            >
-                                                <SelectTrigger className="h-8 w-32" aria-label={`Role for ${user.name}`}>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="owner">Owner</SelectItem>
-                                                    <SelectItem value="staff">Staff</SelectItem>
-                                                    <SelectItem value="accountant">Accountant</SelectItem>
-                                                </SelectContent>
-                                            </Select>
+                                            <RoleCell user={user} isSelf={user.id === auth.user.id} />
                                         </td>
                                         <td className="px-3 py-2">
                                             {user.deactivated_at ? (
