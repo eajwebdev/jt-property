@@ -15,7 +15,9 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use LogicException;
 use Tests\TestCase;
 
@@ -170,6 +172,39 @@ class ReceivableLedgerServiceTest extends TestCase
             'source_id' => 1,
             'reverses_id' => $charge->id,
         ]);
+    }
+
+    public function test_post_rejects_reversal_type(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->entry(LedgerEntryType::Reversal, -1_000, '2026-11-01');
+    }
+
+    public function test_concurrent_reversal_hitting_the_unique_key_is_reported_as_already_reversed(): void
+    {
+        $charge = $this->entry(LedgerEntryType::Charge, 1_000, '2026-11-01');
+
+        // Simulate another transaction committing a reversal after our "already reversed?" check.
+        Event::listen('eloquent.creating: '.LedgerEntry::class, function (LedgerEntry $e) use ($charge) {
+            if ($e->reverses_id === $charge->id) {
+                DB::table('ledger_entries')->insert([
+                    'billing_account_id' => $charge->billing_account_id,
+                    'type' => 'reversal',
+                    'amount_cents' => -1_000,
+                    'effective_date' => '2026-11-01',
+                    'source_type' => 'x',
+                    'source_id' => 1,
+                    'reverses_id' => $charge->id,
+                ]);
+            }
+        });
+
+        try {
+            $this->ledger->reverse($charge, 'racing');
+            $this->fail('The duplicate reversal should be rejected.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('entry', $e->errors());
+        }
     }
 
     public function test_ledger_entries_cannot_be_updated(): void

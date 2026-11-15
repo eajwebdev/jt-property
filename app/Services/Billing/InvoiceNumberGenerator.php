@@ -5,12 +5,17 @@ namespace App\Services\Billing;
 use App\Models\Property;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 
 /** Per-property, per-month invoice numbers: {CODE}-{YYYYMM}-{seq 4}. Call inside the caller's transaction. */
 class InvoiceNumberGenerator
 {
     public function next(Property $p, CarbonInterface $month): string
     {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('InvoiceNumberGenerator::next() must run inside the caller\'s transaction.');
+        }
+
         $key = ['property_id' => $p->id, 'month' => $month->format('Y-m-01')];
 
         // One INSERT ... ON DUPLICATE KEY UPDATE creates or increments the row and takes its

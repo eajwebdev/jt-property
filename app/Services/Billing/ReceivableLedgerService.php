@@ -9,8 +9,10 @@ use App\Models\LedgerEntry;
 use App\Support\Audit;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 /**
  * The accounts-receivable ledger. Sign: + increases what the tenant owes, - decreases it.
@@ -20,6 +22,9 @@ class ReceivableLedgerService
 {
     public function post(BillingAccount $acc, LedgerEntryType $type, int $cents, CarbonInterface $effective, Model $source, ?string $memo = null): LedgerEntry
     {
+        if ($type === LedgerEntryType::Reversal) {
+            throw new InvalidArgumentException('Reversals are created only by reverse().');
+        }
         if ($cents === 0) {
             throw ValidationException::withMessages(['amount' => 'A ledger entry cannot be zero.']);
         }
@@ -48,12 +53,22 @@ class ReceivableLedgerService
     public function balance(BillingAccount $acc, ?CarbonInterface $asOf = null): int
     {
         return (int) LedgerEntry::where('billing_account_id', $acc->id)
-            ->when($asOf, fn ($q) => $q->whereDate('effective_date', '<=', $asOf->toDateString()))
+            ->when($asOf, fn ($q) => $q->where('effective_date', '<=', $asOf->toDateString()))
             ->sum('amount_cents');
     }
 
     /** Post the negated amount, linked by reverses_id. An entry can be reversed once; a reversal cannot be reversed. */
     public function reverse(LedgerEntry $e, string $reason): LedgerEntry
+    {
+        try {
+            return $this->postReversal($e, $reason);
+        } catch (UniqueConstraintViolationException) {
+            // A concurrent reverse() won the reverses_id unique key.
+            throw ValidationException::withMessages(['entry' => 'This entry has already been reversed.']);
+        }
+    }
+
+    private function postReversal(LedgerEntry $e, string $reason): LedgerEntry
     {
         return DB::transaction(function () use ($e, $reason) {
             $e = LedgerEntry::lockForUpdate()->findOrFail($e->id);
