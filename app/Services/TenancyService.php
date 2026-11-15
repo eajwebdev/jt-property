@@ -289,9 +289,12 @@ class TenancyService
                 ]);
             }
 
+            $carriedCharges = $this->carryRecurringCharges($agreement, $new, $start, $last);
+
             Audit::log('agreement.transferred', $agreement, [
                 'old' => ['rental_agreement_id' => $agreement->id, 'unit_id' => $agreement->unit_id, 'bed_id' => $agreement->bed_id, 'end_date' => $last, 'rent_cents' => $oldRentCents],
                 'new' => [
+                    'carried_recurring_charge_ids' => $carriedCharges,
                     'rental_agreement_id' => $new->id, 'unit_id' => $new->unit_id, 'bed_id' => $new->bed_id, 'start_date' => $start, 'rent_cents' => $rentCents,
                     'carried_rates' => $laterRates->map(fn ($r) => ['effective_from' => $r->effective_from->toDateString(), 'rent_cents' => $r->rent_cents])->values()->all(),
                 ],
@@ -300,6 +303,42 @@ class TenancyService
 
             return $new;
         });
+    }
+
+    /**
+     * Move the old agreement's active add-ons to the new one: the old charge ends the day before $start and a
+     * copy starts on $start (same category, label, amount and end). A charge that has not started yet simply
+     * moves. Charges that already ended before $start or are switched off stay put. Returns the new charge ids.
+     *
+     * @return int[]
+     */
+    private function carryRecurringCharges(RentalAgreement $old, RentalAgreement $new, string $start, string $last): array
+    {
+        $carried = [];
+        $charges = $old->recurringCharges()->where('active', true)
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $start))
+            ->orderBy('id')->lockForUpdate()->get();
+
+        foreach ($charges as $charge) {
+            if ($charge->start_date->toDateString() >= $start) {
+                $charge->update(['rental_agreement_id' => $new->id]);
+                $carried[] = $charge->id;
+
+                continue;
+            }
+
+            $copy = $new->recurringCharges()->create([
+                'charge_category_id' => $charge->charge_category_id,
+                'label' => $charge->label,
+                'amount_cents' => $charge->amount_cents,
+                'start_date' => $start,
+                'end_date' => $charge->end_date?->toDateString(),
+            ]);
+            $charge->update(['end_date' => $last]);
+            $carried[] = $copy->id;
+        }
+
+        return $carried;
     }
 
     /** A security deposit is a liability record only: it never changes rent or any balance here. */

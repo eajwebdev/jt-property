@@ -55,6 +55,11 @@ class RentalAgreement extends Model
         return $this->hasMany(RentRate::class);
     }
 
+    public function recurringCharges(): HasMany
+    {
+        return $this->hasMany(RecurringCharge::class);
+    }
+
     public function occupancies(): HasMany
     {
         return $this->hasMany(Occupancy::class);
