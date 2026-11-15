@@ -101,17 +101,17 @@ class UtilityController extends Controller
             'split_method' => [Rule::requiredIf($perBed && in_array($request->input('mode'), ['metered', 'shared'], true)), 'nullable', Rule::in(['equal', 'days', 'percent', 'manual'])],
             'shares' => ['nullable', 'array'],
             'shares.*.agreement_id' => ['required', 'integer', 'distinct', Rule::exists('rental_agreements', 'id')->where('unit_id', $unit->id)],
-            'shares.*.percent_bp' => ['nullable', 'integer', 'min:0', 'max:10000'],
-            'shares.*.manual_cents' => ['nullable', 'integer', 'min:0'],
+            'shares.*.percent_bp' => [Rule::requiredIf($request->input('split_method') === 'percent'), 'nullable', 'integer', 'min:0', 'max:10000'],
+            'shares.*.manual_cents' => [Rule::requiredIf($request->input('split_method') === 'manual'), 'nullable', 'integer', 'min:0'],
         ]);
 
         $split = $perBed && in_array($data['mode'], ['metered', 'shared'], true) ? $data['split_method'] : null;
         $shares = $split === 'percent' || $split === 'manual' ? ($data['shares'] ?? []) : [];
 
-        if ($split === 'percent' && array_sum(array_column($shares, 'percent_bp')) !== 10000) {
+        if ($split === 'percent' && array_sum(array_map(fn ($s) => $s['percent_bp'] ?? 0, $shares)) !== 10000) {
             throw ValidationException::withMessages(['shares' => 'Percent shares must add up to exactly 100%.']);
         }
-        if ($split === 'manual' && (count($shares) === 0 || in_array(null, array_column($shares, 'manual_cents'), true))) {
+        if ($split === 'manual' && (count($shares) === 0 || in_array(null, array_map(fn ($s) => $s['manual_cents'] ?? null, $shares), true))) {
             throw ValidationException::withMessages(['shares' => 'Enter an amount for every tenant.']);
         }
 
@@ -131,8 +131,8 @@ class UtilityController extends Controller
             foreach ($shares as $s) {
                 $config->shares()->create([
                     'rental_agreement_id' => $s['agreement_id'],
-                    'percent_bp' => $split === 'percent' ? $s['percent_bp'] : null,
-                    'manual_cents' => $split === 'manual' ? $s['manual_cents'] : null,
+                    'percent_bp' => $split === 'percent' ? ($s['percent_bp'] ?? null) : null,
+                    'manual_cents' => $split === 'manual' ? ($s['manual_cents'] ?? null) : null,
                 ]);
             }
 

@@ -13,8 +13,11 @@ use App\Models\User;
 use App\Models\UtilityBill;
 use App\Models\UtilityExclusion;
 use App\Models\UtilitySplitShare;
+use App\Services\Billing\BillingCycleResolver;
+use App\Services\Billing\UtilityAllocationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -280,5 +283,80 @@ class UtilitiesHttpTest extends TestCase
             ->where('units.0.utilities.electricity.bill.amount', '₱490.59'));
 
         $this->actingAs(User::factory()->accountant()->create())->get(route('utilities.index'))->assertOk();
+    }
+
+    public function test_manual_shares_are_checked_against_the_agreements_the_bill_is_split_across(): void
+    {
+        $bedUnit = Unit::factory()->for($this->property)->create(['rent_mode' => RentMode::PerBed, 'capacity' => 3]);
+        // Cycle runs the 15th to the 14th, so a tenant who left on Nov 10 has no day in the November cycle.
+        $a = $this->agreement($bedUnit);
+        $a->update(['cycle_start_day' => 15]);
+        $b = $this->agreement($bedUnit);
+        $b->update(['start_date' => '2026-11-16']);
+        $gone = $this->agreement($bedUnit);
+        $gone->update(['cycle_start_day' => 15, 'end_date' => '2026-11-10']);
+        $config = UnitUtility::create(['unit_id' => $bedUnit->id, 'type' => 'water', 'mode' => 'shared', 'split_method' => 'manual']);
+        foreach ([[$a, 70000], [$b, 30000], [$gone, 5000]] as [$agreement, $cents]) {
+            UtilitySplitShare::create(['unit_utility_id' => $config->id, 'rental_agreement_id' => $agreement->id, 'manual_cents' => $cents]);
+        }
+        $this->actingAs($this->staff());
+
+        $this->post(route('utility-bills.store'), ['unit_id' => $bedUnit->id, 'type' => 'water', 'bill_month' => '2026-11', 'amount' => '1000'])->assertSessionHasNoErrors();
+
+        $this->assertSame(
+            [$a->id => 70000, $b->id => 30000],
+            app(UtilityAllocationService::class)->allocate(
+                UtilityBill::firstOrFail(),
+                app(UtilityAllocationService::class)->eligibleAgreements($bedUnit, 2026, 11),
+                app(UtilityAllocationService::class)->eligibleAgreements($bedUnit, 2026, 11)
+                    ->mapWithKeys(fn ($x) => [$x->id => app(BillingCycleResolver::class)->cycleFor($x, 2026, 11)])->all(),
+            ),
+        );
+    }
+
+    public function test_a_share_row_missing_its_amount_is_a_validation_error_not_a_500(): void
+    {
+        $this->actingAs(User::factory()->owner()->create());
+        $bedUnit = Unit::factory()->for($this->property)->create(['rent_mode' => RentMode::PerBed, 'capacity' => 2]);
+        $a = $this->agreement($bedUnit);
+        $url = route('utilities.configure', [$bedUnit, 'water']);
+
+        $this->put($url, ['mode' => 'shared', 'split_method' => 'percent', 'shares' => [['agreement_id' => $a->id]]])->assertSessionHasErrors('shares.0.percent_bp');
+        $this->put($url, ['mode' => 'shared', 'split_method' => 'manual', 'shares' => [['agreement_id' => $a->id]]])->assertSessionHasErrors('shares.0.manual_cents');
+        $this->assertSame(0, UnitUtility::count());
+    }
+
+    public function test_replacing_evidence_deletes_the_old_file(): void
+    {
+        Storage::fake('local');
+        $this->metered();
+        $this->actingAs($this->staff());
+        $this->post(route('utility-bills.store'), $this->reading(['evidence' => UploadedFile::fake()->image('a.jpg')]));
+        $first = UtilityBill::firstOrFail()->evidence_path;
+
+        $this->post(route('utility-bills.store'), $this->reading(['evidence' => UploadedFile::fake()->image('b.jpg')]))->assertSessionHasNoErrors();
+
+        $second = UtilityBill::firstOrFail()->evidence_path;
+        $this->assertNotSame($first, $second);
+        Storage::disk('local')->assertMissing($first);
+        Storage::disk('local')->assertExists($second);
+    }
+
+    public function test_a_concurrent_duplicate_is_a_validation_error_and_leaves_no_orphan_file(): void
+    {
+        Storage::fake('local');
+        $this->metered();
+        $this->actingAs($this->staff());
+        // Simulate another request winning the race between our lookup and our insert.
+        UtilityBill::creating(function (UtilityBill $b) {
+            UtilityBill::withoutEvents(fn () => DB::table('utility_bills')->insert([
+                'unit_id' => $b->unit_id, 'type' => $b->type, 'bill_month' => '2026-11-01', 'base_charge_cents' => 0, 'amount_cents' => 1,
+                'status' => 'draft', 'created_at' => now(), 'updated_at' => now(),
+            ]));
+        });
+
+        $this->post(route('utility-bills.store'), $this->reading(['evidence' => UploadedFile::fake()->image('a.jpg')]))->assertSessionHasErrors('bill_month');
+
+        $this->assertSame([], Storage::disk('local')->allFiles());
     }
 }

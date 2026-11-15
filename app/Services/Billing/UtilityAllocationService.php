@@ -5,11 +5,13 @@ namespace App\Services\Billing;
 use App\Enums\RentMode;
 use App\Models\ChargeCategory;
 use App\Models\RentalAgreement;
+use App\Models\Unit;
 use App\Models\UnitUtility;
 use App\Models\UtilityBill;
 use App\Models\UtilityExclusion;
 use App\Support\Money;
 use App\Support\Quantity;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use LogicException;
 
@@ -21,6 +23,9 @@ class UtilityAllocationService
 {
     /** type => [label, unit of measure] */
     public const TYPES = ['electricity' => ['Electricity', 'kWh'], 'water' => ['Water', 'm³']];
+
+    /** @var array<string, ?int> charge category id by utility type */
+    private array $categories = [];
 
     public function __construct(private BillingCycleResolver $cycles) {}
 
@@ -91,7 +96,7 @@ class UtilityAllocationService
                 continue;
             }
 
-            $eligible = $this->eligible($this->unitAgreements($agreement, $cycle), [$agreement->id => $cycle] + $this->cyclesFor($agreement, $cycle));
+            $eligible = $this->eligibleWithDays($agreement->unit_id, $month->year, $month->month);
             if ($eligible->isEmpty()) {
                 $noOccupants[] = $type;
 
@@ -120,34 +125,42 @@ class UtilityAllocationService
 
     private function line(string $type, string $label, int $cents, UtilityBill|UnitUtility $source): array
     {
-        static $categories = [];
-        $categories[$type] ??= ChargeCategory::where('name', self::TYPES[$type][0])->value('id');
+        $this->categories[$type] ??= ChargeCategory::where('name', self::TYPES[$type][0])->value('id');
 
-        return ['type' => $type, 'label' => $label, 'amount_cents' => $cents, 'category_id' => $categories[$type], 'source' => $source];
+        return ['type' => $type, 'label' => $label, 'amount_cents' => $cents, 'category_id' => $this->categories[$type], 'source' => $source];
     }
 
-    /** @return Collection<int, RentalAgreement> every agreement of the unit that overlaps the cycle's period */
-    private function unitAgreements(RentalAgreement $agreement, BillingCycle $cycle): Collection
+    /**
+     * The one definition of who shares a unit's utility bill for a month: agreements with at least one
+     * covered day in their own billing cycle (via BillingCycleResolver). Keyed by agreement id, ascending.
+     *
+     * @return Collection<int, RentalAgreement>
+     */
+    public function eligibleAgreements(Unit $unit, int $year, int $month): Collection
     {
-        return RentalAgreement::where('unit_id', $agreement->unit_id)
-            ->whereDate('start_date', '<=', $cycle->periodEnd->toDateString())
-            ->where(fn ($q) => $q->whereNull('end_date')->orWhereDate('end_date', '>=', $cycle->periodStart->toDateString()))
-            ->get();
+        return $this->eligibleWithDays($unit->id, $year, $month)->map(fn ($e) => $e['agreement']);
     }
 
-    /** @return array<int, BillingCycle|null> */
-    private function cyclesFor(RentalAgreement $agreement, BillingCycle $cycle): array
-    {
-        return $this->unitAgreements($agreement, $cycle)
-            ->mapWithKeys(fn ($a) => [$a->id => $this->cycles->cycleFor($a, $cycle->periodStart->year, $cycle->periodStart->month)])
-            ->all();
-    }
-
-    /** @return Collection<int, array{agreement: RentalAgreement, days: int}> keyed by agreement id, ascending */
+    /** @return Collection<int, array{agreement: RentalAgreement, days: int}> keyed by agreement id, ascending; cycles supplied by the caller */
     private function eligible(Collection $agreements, array $cycles): Collection
     {
         return $agreements
             ->mapWithKeys(fn (RentalAgreement $a) => [$a->id => ['agreement' => $a, 'days' => ($cycles[$a->id] ?? null)?->coveredDays($a) ?? 0]])
+            ->filter(fn ($e) => $e['days'] > 0)
+            ->sortKeys();
+    }
+
+    /** @return Collection<int, array{agreement: RentalAgreement, days: int}> */
+    private function eligibleWithDays(int $unitId, int $year, int $month): Collection
+    {
+        $first = CarbonImmutable::create($year, $month, 1, 0, 0, 0, 'Asia/Manila');
+
+        // Wide date filter only narrows the query; the resolver decides who actually covers days.
+        return RentalAgreement::where('unit_id', $unitId)
+            ->whereDate('start_date', '<=', $first->addMonthsNoOverflow(2)->toDateString())
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhereDate('end_date', '>=', $first->toDateString()))
+            ->get()
+            ->mapWithKeys(fn (RentalAgreement $a) => [$a->id => ['agreement' => $a, 'days' => $this->cycles->cycleFor($a, $year, $month)?->coveredDays($a) ?? 0]])
             ->filter(fn ($e) => $e['days'] > 0)
             ->sortKeys();
     }

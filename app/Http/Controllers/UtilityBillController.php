@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\RentalAgreement;
 use App\Models\Unit;
 use App\Models\UnitUtility;
 use App\Models\UtilityBill;
@@ -12,6 +11,7 @@ use App\Services\Billing\UtilityAllocationService;
 use App\Support\Audit;
 use App\Support\Money;
 use App\Support\Quantity;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -59,17 +59,36 @@ class UtilityBillController extends Controller
         $bill->fill($config->mode === 'metered' ? $this->metered($data, $unit, $config, $month) : $this->shared($data, $unit, $config, $month));
         $bill->fill(['reading_date' => $data['reading_date'] ?? null, 'entered_by' => $bill->entered_by ?? auth()->id(), 'status' => 'draft']);
 
-        DB::transaction(function () use ($request, $bill, $data) {
-            $old = $bill->exists ? $bill->getOriginal() : null;
-            if ($request->hasFile('evidence')) {
-                $bill->evidence_path = $request->file('evidence')->store('utility-evidence', 'local');
+        $newFile = $request->hasFile('evidence') ? $request->file('evidence')->store('utility-evidence', 'local') : null;
+        $replaced = $bill->evidence_path;
+
+        try {
+            DB::transaction(function () use ($bill, $data, $newFile) {
+                $old = $bill->exists ? $bill->getOriginal() : null;
+                if ($newFile !== null) {
+                    $bill->evidence_path = $newFile;
+                }
+                $bill->save();
+                Audit::log('utility_bill.recorded', $bill, [
+                    'old' => $old ? ['amount_cents' => $old['amount_cents'], 'current_reading_e3' => $old['current_reading_e3']] : null,
+                    'new' => $bill->only(['unit_id', 'type', 'previous_reading_e3', 'current_reading_e3', 'rate_e4', 'base_charge_cents', 'amount_cents']) + ['bill_month' => $data['bill_month']],
+                ]);
+            });
+        } catch (\Throwable $e) {
+            // Nothing was saved, so the uploaded file would be orphaned.
+            if ($newFile !== null) {
+                Storage::disk('local')->delete($newFile);
             }
-            $bill->save();
-            Audit::log('utility_bill.recorded', $bill, [
-                'old' => $old ? ['amount_cents' => $old['amount_cents'], 'current_reading_e3' => $old['current_reading_e3']] : null,
-                'new' => $bill->only(['unit_id', 'type', 'previous_reading_e3', 'current_reading_e3', 'rate_e4', 'base_charge_cents', 'amount_cents']) + ['bill_month' => $data['bill_month']],
-            ]);
-        });
+
+            // Two people entering the same month at once: the second one gets a normal error, not a 500.
+            throw $e instanceof UniqueConstraintViolationException
+                ? ValidationException::withMessages(['bill_month' => 'Someone just entered this month. Reload and check the figures.'])
+                : $e;
+        }
+
+        if ($newFile !== null && $replaced !== null) {
+            Storage::disk('local')->delete($replaced);
+        }
 
         return back()->with('success', ucfirst($data['type']).' for Room '.$unit->code.': '.Money::format($bill->amount_cents).'.');
     }
@@ -137,10 +156,7 @@ class UtilityBillController extends Controller
             return;
         }
 
-        $present = RentalAgreement::where('unit_id', $unit->id)
-            ->whereDate('start_date', '<=', $month->copy()->endOfMonth()->toDateString())
-            ->where(fn ($q) => $q->whereNull('end_date')->orWhereDate('end_date', '>=', $month->toDateString()))
-            ->pluck('id');
+        $present = $this->utilities->eligibleAgreements($unit, $month->year, $month->month)->keys();
         $sum = (int) $config->shares()->whereIn('rental_agreement_id', $present)->sum('manual_cents');
 
         if ($sum !== $amount) {
