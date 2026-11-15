@@ -1,4 +1,3 @@
-import AppLogoIcon from '@/components/app-logo-icon';
 import { Link } from '@inertiajs/react';
 
 interface AuthLayoutProps {
@@ -15,8 +14,9 @@ export default function AuthSimpleLayout({ children, title, description }: AuthL
                 <div className="flex flex-col gap-8">
                     <div className="flex flex-col items-center gap-4">
                         <Link href={route('home')} className="flex flex-col items-center gap-2 font-medium">
-                            <div className="mb-1 flex h-9 w-9 items-center justify-center rounded-md">
-                                <AppLogoIcon className="size-9 fill-current text-[var(--foreground)] dark:text-white" />
+                            {/* horizontal logo has a light background; the white panel keeps it clean in dark mode */}
+                            <div className="mb-1 rounded-xl bg-white px-3 py-2 shadow-sm dark:ring-1 dark:ring-white/10">
+                                <img src="/branding/jt-logo-horizontal.webp" alt="JT Property Management System" className="h-16 w-auto" />
                             </div>
                             <span className="sr-only">{title}</span>
                         </Link>

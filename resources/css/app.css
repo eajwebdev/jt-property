@@ -38,6 +38,14 @@
     --color-destructive: var(--destructive);
     --color-destructive-foreground: var(--destructive-foreground);
 
+    /* JT additions: brand navy, due-soon amber, paid green */
+    --color-brand: var(--brand);
+    --color-brand-foreground: var(--brand-foreground);
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);
@@ -58,93 +66,98 @@
     --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/*
-  The default border color has changed to `currentColor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
-
-  If we ever want to remove these styles, we need to add an explicit border
-  color utility to any element that depends on these defaults.
-*/
 @layer base {
     *,
     ::after,
     ::before,
     ::backdrop,
     ::file-selector-button {
-        border-color: var(--color-gray-200, currentColor);
+        border-color: var(--border, currentColor);
     }
 }
 
+/* JT brand tokens — source: docs/brand-guidelines.md */
 :root {
-    --background: hsl(0, 0%, 100%);
-    --foreground: hsl(0, 0%, 3.9%);
-    --card: hsl(0, 0%, 100%);
-    --card-foreground: hsl(0, 0%, 3.9%);
-    --popover: hsl(0, 0%, 100%);
-    --popover-foreground: hsl(0, 0%, 3.9%);
-    --primary: hsl(0, 0%, 9%);
-    --primary-foreground: hsl(0, 0%, 98%);
-    --secondary: hsl(0, 0%, 96.1%);
-    --secondary-foreground: hsl(0, 0%, 9%);
-    --muted: hsl(0, 0%, 96.1%);
-    --muted-foreground: hsl(0, 0%, 45.1%);
-    --accent: hsl(0, 0%, 96.1%);
-    --accent-foreground: hsl(0, 0%, 9%);
-    --destructive: hsl(0, 84.2%, 60.2%);
-    --destructive-foreground: hsl(0, 0%, 98%);
-    --border: hsl(0, 0%, 92.8%);
-    --input: hsl(0, 0%, 89.8%);
-    --ring: hsl(0, 0%, 3.9%);
-    --chart-1: hsl(12, 76%, 61%);
-    --chart-2: hsl(173, 58%, 39%);
-    --chart-3: hsl(197, 37%, 24%);
-    --chart-4: hsl(43, 74%, 66%);
-    --chart-5: hsl(27, 87%, 67%);
-    --radius: 0.5rem;
-    --sidebar-background: hsl(0, 0%, 98%);
-    --sidebar-foreground: hsl(240, 5.3%, 30%);
-    --sidebar-primary: hsl(0, 0%, 10%);
-    --sidebar-primary-foreground: hsl(0, 0%, 98%);
-    --sidebar-accent: hsl(0, 0%, 94%);
-    --sidebar-accent-foreground: hsl(0, 0%, 30%);
-    --sidebar-border: hsl(0, 0%, 91%);
-    --sidebar-ring: hsl(217.2, 91.2%, 59.8%);
+    --background: #f5f9fc;
+    --foreground: #0f1e2e;
+    --card: #ffffff;
+    --card-foreground: #0f1e2e;
+    --popover: #ffffff;
+    --popover-foreground: #0f1e2e;
+    --primary: #007a69;
+    --primary-foreground: #ffffff;
+    --secondary: #e8f0f7;
+    --secondary-foreground: #064578;
+    --muted: #edf2f7;
+    --muted-foreground: #52637a;
+    --accent: #e3f6f1;
+    --accent-foreground: #00594d;
+    --destructive: #c2362f;
+    --destructive-foreground: #ffffff;
+    --border: #dce5ee;
+    --input: #cbd7e3;
+    --ring: #24c5a4;
+    --brand: #064578;
+    --brand-foreground: #ffffff;
+    --warning: #975a16;
+    --warning-foreground: #ffffff;
+    --success: #007a69;
+    --success-foreground: #ffffff;
+    --chart-1: #064578;
+    --chart-2: #007a69;
+    --chart-3: #24c5a4;
+    --chart-4: #975a16;
+    --chart-5: #c2362f;
+    --radius: 0.625rem;
+    --sidebar-background: #ffffff;
+    --sidebar-foreground: #33465c;
+    --sidebar-primary: #064578;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #e8f0f7;
+    --sidebar-accent-foreground: #064578;
+    --sidebar-border: #dce5ee;
+    --sidebar-ring: #24c5a4;
 }
 
 .dark {
-    --background: hsl(0, 0%, 3.9%);
-    --foreground: hsl(0, 0%, 98%);
-    --card: hsl(0, 0%, 3.9%);
-    --card-foreground: hsl(0, 0%, 98%);
-    --popover: hsl(0, 0%, 3.9%);
-    --popover-foreground: hsl(0, 0%, 98%);
-    --primary: hsl(0, 0%, 98%);
-    --primary-foreground: hsl(0, 0%, 9%);
-    --secondary: hsl(0, 0%, 14.9%);
-    --secondary-foreground: hsl(0, 0%, 98%);
-    --muted: hsl(0, 0%, 6.9%);
-    --muted-foreground: hsl(0, 0%, 63.9%);
-    --accent: hsl(0, 0%, 14.9%);
-    --accent-foreground: hsl(0, 0%, 98%);
-    --destructive: hsl(0, 84%, 60%);
-    --destructive-foreground: hsl(0, 0%, 98%);
-    --border: hsl(0, 0%, 14.9%);
-    --input: hsl(0, 0%, 14.9%);
-    --ring: hsl(0, 0%, 83.1%);
-    --chart-1: hsl(220, 70%, 50%);
-    --chart-2: hsl(160, 60%, 45%);
-    --chart-3: hsl(30, 80%, 55%);
-    --chart-4: hsl(280, 65%, 60%);
-    --chart-5: hsl(340, 75%, 55%);
-    --sidebar-background: hsl(0, 0%, 7%);
-    --sidebar-foreground: hsl(0, 0%, 80%);
-    --sidebar-primary: hsl(360, 100%, 100%);
-    --sidebar-primary-foreground: hsl(0, 0%, 100%);
-    --sidebar-accent: hsl(0, 0%, 15.9%);
-    --sidebar-accent-foreground: hsl(240, 4.8%, 95.9%);
-    --sidebar-border: hsl(0, 0%, 15.9%);
-    --sidebar-ring: hsl(217.2, 91.2%, 59.8%);
+    --background: #101d2d;
+    --foreground: #e6edf5;
+    --card: #16263a;
+    --card-foreground: #e6edf5;
+    --popover: #16263a;
+    --popover-foreground: #e6edf5;
+    --primary: #24c5a4;
+    --primary-foreground: #06231d;
+    --secondary: #1d3048;
+    --secondary-foreground: #e6edf5;
+    --muted: #1a2b40;
+    --muted-foreground: #94a6bc;
+    --accent: #173a3a;
+    --accent-foreground: #b9efe2;
+    --destructive: #f0716a;
+    --destructive-foreground: #2a0806;
+    --border: #26384f;
+    --input: #2e4460;
+    --ring: #24c5a4;
+    --brand: #7fb3e0;
+    --brand-foreground: #0b1a2a;
+    --warning: #e0a84a;
+    --warning-foreground: #2a1a02;
+    --success: #24c5a4;
+    --success-foreground: #06231d;
+    --chart-1: #7fb3e0;
+    --chart-2: #24c5a4;
+    --chart-3: #8fe0cd;
+    --chart-4: #e0a84a;
+    --chart-5: #f0716a;
+    --sidebar-background: #0d1826;
+    --sidebar-foreground: #c3d0de;
+    --sidebar-primary: #24c5a4;
+    --sidebar-primary-foreground: #06231d;
+    --sidebar-accent: #1d3048;
+    --sidebar-accent-foreground: #e6edf5;
+    --sidebar-border: #26384f;
+    --sidebar-ring: #24c5a4;
 }
 
 @layer base {

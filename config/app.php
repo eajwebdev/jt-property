@@ -65,7 +65,7 @@ return [
     |
     */
 
-    'timezone' => env('APP_TIMEZONE', 'UTC'),
+    'timezone' => env('APP_TIMEZONE', 'Asia/Manila'), // business dates (due dates, cutoffs) are Manila time
 
     /*
     |--------------------------------------------------------------------------
@@ -122,5 +122,16 @@ return [
         'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Demo Seed Password
+    |--------------------------------------------------------------------------
+    |
+    | Password used by DatabaseSeeder. Required outside local/testing.
+    |
+    */
+
+    'seed_password' => env('SEED_PASSWORD'),
 
 ];

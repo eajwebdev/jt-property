@@ -3,18 +3,18 @@
 Mark items [x] only after working code and tests confirm them. Use the master prompt as the authoritative functional specification.
 
 ## Foundation
-- [ ] Exactly one Laravel repository and Laravel-managed React/Inertia UI
-- [ ] PHP 8.3+ compatible with Laravel 13; MySQL is connected
-- [ ] Owner/staff permissions; mobile-friendly sidebar; light/dark theme
-- [ ] JT logos, favicon and brand color palette installed
-- [ ] Seed data and README setup commands verified
+- [x] Exactly one Laravel repository and Laravel-managed React/Inertia UI
+- [x] PHP 8.3+ compatible with Laravel 13; MySQL is connected — *owner chose Laravel 12 on PHP 8.2.12 (2026-11-15); MariaDB 10.4 `jt_property` connected*
+- [ ] Owner/staff permissions; mobile-friendly sidebar; light/dark theme — *roles, owner-only user mgmt, deactivation and per-user Light/Dark/System done + tested; mobile layout not yet checked in a browser (Phase 6)*
+- [x] JT logos, favicon and brand color palette installed
+- [x] Seed data and README setup commands verified — *`migrate:fresh --seed` OK; property/tenant demo data comes in Phase 2–4*
 
 ## Property and tenant setup
-- [ ] Multiple properties, rooms, bed capacity and occupancy histories
-- [ ] Whole-room single-payer lease and individual per-bed leases work
-- [ ] Each tenant has independent rent and due date
-- [ ] Room capacity and date overlap validation
-- [ ] Lease move-in/out, transfers, deposits and rate histories
+- [x] Multiple properties, rooms, bed capacity and occupancy histories
+- [x] Whole-room single-payer lease and individual per-bed leases work
+- [x] Each tenant has independent rent and due date
+- [x] Room capacity and date overlap validation
+- [x] Lease move-in/out, transfers, deposits and rate histories — *verified 2026-11-16: 184 tests incl. A101 4-tenant acceptance, peak capacity, inclusive overlap, transfer rollback*
 
 ## Billing correctness
 - [ ] Per-tenant issue and due dates incl. 29th/30th/31st and February

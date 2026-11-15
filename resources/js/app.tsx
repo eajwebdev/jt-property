@@ -1,10 +1,10 @@
 import '../css/app.css';
 
-import { createInertiaApp } from '@inertiajs/react';
+import { createInertiaApp, router } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { route as routeFn } from 'ziggy-js';
-import { initializeTheme } from './hooks/use-appearance';
+import { Appearance, initializeTheme, syncAppearance } from './hooks/use-appearance';
 
 declare global {
     const route: typeof routeFn;
@@ -21,8 +21,14 @@ createInertiaApp({
         root.render(<App {...props} />);
     },
     progress: {
-        color: '#4B5563',
+        color: '#007A69', // brand teal
     },
+});
+
+// Per-user theme: the saved value from the database wins on every page load/login.
+router.on('navigate', (event) => {
+    const saved = (event.detail.page.props.auth as { user?: { appearance?: Appearance } } | undefined)?.user?.appearance;
+    if (saved) syncAppearance(saved);
 });
 
 // This will set light / dark mode on load...
