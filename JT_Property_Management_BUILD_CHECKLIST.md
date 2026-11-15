@@ -10,11 +10,11 @@ Mark items [x] only after working code and tests confirm them. Use the master pr
 - [x] Seed data and README setup commands verified — *`migrate:fresh --seed` OK; property/tenant demo data comes in Phase 2–4*
 
 ## Property and tenant setup
-- [ ] Multiple properties, rooms, bed capacity and occupancy histories
-- [ ] Whole-room single-payer lease and individual per-bed leases work
-- [ ] Each tenant has independent rent and due date
-- [ ] Room capacity and date overlap validation
-- [ ] Lease move-in/out, transfers, deposits and rate histories
+- [x] Multiple properties, rooms, bed capacity and occupancy histories
+- [x] Whole-room single-payer lease and individual per-bed leases work
+- [x] Each tenant has independent rent and due date
+- [x] Room capacity and date overlap validation
+- [x] Lease move-in/out, transfers, deposits and rate histories — *verified 2026-11-16: 184 tests incl. A101 4-tenant acceptance, peak capacity, inclusive overlap, transfer rollback*
 
 ## Billing correctness
 - [ ] Per-tenant issue and due dates incl. 29th/30th/31st and February
