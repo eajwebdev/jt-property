@@ -213,12 +213,4 @@ Deliver:
 
 **Agent execution expectations:** Begin by inspecting the repository and installed environment. If blank, scaffold the project. Make actual file changes, run the app and tests, fix errors, and proceed phase-by-phase without stopping after a plan. If some credentials or runtime prerequisites are genuinely unavailable, complete everything possible locally with config placeholders; explain the exact blocker and give the required setup steps. Do not use hard-coded production passwords, personal data, fake sent-email claims, or made-up payment confirmations. Prioritize the correctness of rent, balance, payment, and due-date calculations over cosmetic extras. Continue until the core workflows are tested and usable.
 
----
 
-## Helpful official references (verify installation details at implementation time)
-- Laravel React starter kit: https://laravel.com/starter-kits
-- Laravel 13 requirements: https://laravel.com/framework/docs/13.x/deployment
-- Laravel 13 queues: https://laravel.com/framework/docs/13.x/queues
-- Laravel 13 scheduling: https://laravel.com/framework/docs/13.x/scheduling
-- Laravel 13 mail: https://laravel.com/framework/docs/13.x/mail
-- Spatie Laravel PDF drivers: https://github.com/spatie/laravel-pdf

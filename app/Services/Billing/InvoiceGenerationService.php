@@ -8,6 +8,7 @@ use App\Enums\LedgerEntryType;
 use App\Models\BillingBatch;
 use App\Models\BillingBatchItem;
 use App\Models\Invoice;
+use App\Models\InvoiceLineItem;
 use App\Models\LedgerEntry;
 use App\Models\OneTimeCharge;
 use App\Models\PaymentAllocation;
@@ -100,8 +101,41 @@ class InvoiceGenerationService
             }
 
             $invoice->update(['status' => InvoiceStatus::Void, 'voided_at' => now(), 'void_reason' => $reason, 'voided_by' => $by->id]);
-            Audit::log('invoice.voided', $invoice, ['number' => $invoice->number, 'amount_cents' => $invoice->current_charges_cents, 'reason' => $reason]);
+            $utilityBills = $this->reopenUtilityBills($invoice);
+            Audit::log('invoice.voided', $invoice, ['number' => $invoice->number, 'amount_cents' => $invoice->current_charges_cents, 'reason' => $reason, 'utility_bills' => $utilityBills]);
         });
+    }
+
+    /**
+     * A voided bill frees the utility bills it froze, so a wrong reading can be corrected and the bill
+     * reissued. A bill still used by another finalized invoice (a sibling's) stays billed.
+     *
+     * @return array<int, string> utility bill id => what happened
+     */
+    private function reopenUtilityBills(Invoice $invoice): array
+    {
+        $type = (new UtilityBill)->getMorphClass();
+        $notes = [];
+
+        foreach (InvoiceLineItem::where('invoice_id', $invoice->id)->where('source_type', $type)->pluck('source_id')->unique() as $id) {
+            $bill = UtilityBill::lockForUpdate()->find($id);
+            if ($bill === null || ! $bill->isBilled()) {
+                continue;
+            }
+
+            $usedElsewhere = InvoiceLineItem::where('source_type', $type)->where('source_id', $id)->where('invoice_id', '!=', $invoice->id)
+                ->whereHas('invoice', fn ($q) => $q->where('status', InvoiceStatus::Finalized))->exists();
+            if ($usedElsewhere) {
+                $notes[$id] = 'kept billed: still used by another finalized invoice';
+
+                continue;
+            }
+
+            $bill->reopenAfterVoid();
+            $notes[$id] = 'reopened to draft';
+        }
+
+        return $notes;
     }
 
     /** Bill the same agreement and cycle again after a void; the new invoice has a new number and a `:reissue:{n}` key. */
@@ -132,16 +166,17 @@ class InvoiceGenerationService
     {
         try {
             [$status, $invoice, $message] = DB::transaction(fn () => $this->bill($item->rental_agreement_id, $batch));
-        } catch (UniqueConstraintViolationException) {
-            // A concurrent run took the idempotency key between our check and insert.
-            $status = BatchItemStatus::AlreadyBilled;
-            $invoice = null;
-            $message = 'Another run billed this agreement at the same time.';
         } catch (Throwable $e) {
-            Log::error('Invoice generation failed', ['agreement_id' => $item->rental_agreement_id, 'batch_id' => $batch->id, 'exception' => $e]);
-            $status = BatchItemStatus::Failed;
             $invoice = null;
-            $message = $e->getMessage();
+            if ($e instanceof UniqueConstraintViolationException && str_contains($e->getMessage(), 'invoices_idempotency_key_unique')) {
+                // A concurrent run took the idempotency key between our check and insert.
+                $status = BatchItemStatus::AlreadyBilled;
+                $message = 'Another run billed this agreement at the same time.';
+            } else {
+                Log::error('Invoice generation failed', ['agreement_id' => $item->rental_agreement_id, 'batch_id' => $batch->id, 'exception' => $e]);
+                $status = BatchItemStatus::Failed;
+                $message = $e->getMessage();
+            }
         }
 
         $item->update(['status' => $status, 'invoice_id' => $invoice?->id, 'message' => $message]);

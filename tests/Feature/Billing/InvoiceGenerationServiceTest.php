@@ -509,6 +509,74 @@ class InvoiceGenerationServiceTest extends TestCase
         $this->assertSame(100001, $lineA->amount_cents + $lineB->amount_cents);
     }
 
+    public function test_void_reopens_the_utility_bill_so_a_wrong_reading_can_be_fixed_and_reissued(): void
+    {
+        $a = $this->agreement(350000);
+        $this->utility('electricity', 'metered');
+        $bill = UtilityBill::create(['unit_id' => $this->unit->id, 'type' => 'electricity', 'bill_month' => '2026-11-01', 'previous_reading_e3' => 0, 'current_reading_e3' => 100000, 'rate_e4' => 10000, 'base_charge_cents' => 0, 'amount_cents' => 0, 'status' => 'draft']);
+        $this->service->generate(2026, 11, $this->owner);
+        $invoice = Invoice::sole();
+        $this->assertSame(10000 + 350000, $invoice->current_charges_cents);
+        $this->assertSame('billed', $bill->fresh()->status);
+
+        $this->service->void($invoice, 'Wrong reading entered', $this->owner);
+
+        $this->assertSame('draft', $bill->fresh()->status);
+        $this->assertSame(0, UtilityAllocation::where('utility_bill_id', $bill->id)->count());
+
+        $bill->fresh()->update(['current_reading_e3' => 200000]);
+        $new = $this->service->reissue($invoice->fresh(), $this->owner)->items->sole()->invoice;
+
+        $this->assertSame(20000 + 350000, $new->current_charges_cents);
+        $this->assertSame('billed', $bill->fresh()->status);
+        $this->assertSame(1, UtilityAllocation::where('utility_bill_id', $bill->id)->count());
+        $this->assertSame(370000, $this->balance($a));
+    }
+
+    public function test_void_keeps_a_shared_bill_billed_while_a_sibling_invoice_still_uses_it(): void
+    {
+        $a = $this->agreement(350000);
+        $b = $this->agreement(350000);
+        $this->utility('water', 'shared', ['split_method' => 'equal']);
+        $bill = UtilityBill::create(['unit_id' => $this->unit->id, 'type' => 'water', 'bill_month' => '2026-11-01', 'base_charge_cents' => 0, 'amount_cents' => 100000, 'status' => 'draft']);
+        $this->service->generate(2026, 11, $this->owner);
+
+        $this->service->void(Invoice::where('rental_agreement_id', $a->id)->sole(), 'Wrong rent entered', $this->owner);
+
+        $this->assertSame('billed', $bill->fresh()->status);
+        $this->assertSame(2, UtilityAllocation::where('utility_bill_id', $bill->id)->count());
+        $log = \App\Models\ActivityLog::where('action', 'invoice.voided')->latest('id')->first();
+        $this->assertStringContainsString('kept billed', json_encode($log->properties));
+
+        // Once the sibling is voided too, the bill is freed.
+        $this->service->void(Invoice::where('rental_agreement_id', $b->id)->sole(), 'Wrong rent entered', $this->owner);
+        $this->assertSame('draft', $bill->fresh()->status);
+        $this->assertSame(0, UtilityAllocation::where('utility_bill_id', $bill->id)->count());
+    }
+
+    public function test_only_an_idempotency_key_collision_is_already_billed_other_unique_errors_fail(): void
+    {
+        $a = $this->agreement(350000);
+        $b = $this->agreement(350000);
+        $make = fn (RentalAgreement $x, string $number, string $key, string $start) => Invoice::create([
+            'billing_account_id' => $x->billing_account_id, 'rental_agreement_id' => $x->id, 'property_id' => $this->property->id,
+            'number' => $number, 'period_start' => $start, 'period_end' => $start, 'issue_date' => $start, 'due_date' => $start,
+            'status' => InvoiceStatus::Finalized, 'current_charges_cents' => 0, 'idempotency_key' => $key, 'finalized_at' => now(),
+        ]);
+
+        // Same key already taken (by an invoice for another period): the race case.
+        $make($a, 'OTHER-1', "agreement:{$a->id}:cycle:2026-11-01", '2026-10-01');
+
+        $itemA = $this->service->generate(2026, 11, $this->owner, null, [$a->id])->items->sole();
+        // Next invoice number already taken: a real failure, not "already billed".
+        $make($b, $this->property->code.'-202611-0001', 'unrelated-key', '2026-10-01');
+        $itemB = $this->service->generate(2026, 11, $this->owner, null, [$b->id])->items->sole();
+
+        $this->assertSame(BatchItemStatus::AlreadyBilled, $itemA->status);
+        $this->assertSame(BatchItemStatus::Failed, $itemB->status);
+        $this->assertStringContainsString('Duplicate entry', $itemB->message);
+    }
+
     public function test_property_filter_and_agreement_filter_limit_the_batch(): void
     {
         $other = Property::factory()->create();

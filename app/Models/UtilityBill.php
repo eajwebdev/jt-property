@@ -28,9 +28,23 @@ class UtilityBill extends Model
         ];
     }
 
+    private static bool $reopening = false;
+
+    /** The one allowed way back from billed: only InvoiceGenerationService::void() calls this. Drops the frozen shares. */
+    public function reopenAfterVoid(): void
+    {
+        self::$reopening = true;
+        try {
+            $this->update(['status' => 'draft']);
+        } finally {
+            self::$reopening = false;
+        }
+        $this->allocations()->get()->each->delete();
+    }
+
     protected static function booted(): void
     {
-        static::updating(fn (self $b) => $b->getOriginal('status') === 'billed' ? throw new LogicException('A billed utility bill cannot be changed.') : null);
+        static::updating(fn (self $b) => $b->getOriginal('status') === 'billed' && ! self::$reopening ? throw new LogicException('A billed utility bill cannot be changed.') : null);
         static::deleting(fn (self $b) => $b->status === 'billed' ? throw new LogicException('A billed utility bill cannot be deleted.') : null);
     }
 
