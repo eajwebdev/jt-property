@@ -374,9 +374,25 @@ function CategoriesSection({ categories, canManage }: { categories: Category[]; 
         e.preventDefault();
         form.post(route('charge-categories.store'), { preserveScroll: true, onSuccess: () => form.reset('name') });
     };
+    const [renaming, setRenaming] = useState<Category | null>(null);
+    const [newName, setNewName] = useState('');
     const rename = (c: Category) => {
-        const name = window.prompt('New name', c.name);
-        if (name && name.trim() !== c.name) router.patch(route('charge-categories.update', c.id), { name }, { preserveScroll: true });
+        setRenaming(c);
+        setNewName(c.name);
+    };
+    const [renameError, setRenameError] = useState<string | undefined>();
+    const saveRename: FormEventHandler = (e) => {
+        e.preventDefault();
+        if (!renaming) return;
+        router.patch(
+            route('charge-categories.update', renaming.id),
+            { name: newName },
+            {
+                preserveScroll: true,
+                onSuccess: () => setRenaming(null),
+                onError: (errs) => setRenameError(errs.name),
+            },
+        );
     };
     return (
         <div className="space-y-4">
@@ -399,6 +415,35 @@ function CategoriesSection({ categories, canManage }: { categories: Category[]; 
                     </li>
                 ))}
             </ul>
+            <Dialog open={renaming !== null} onOpenChange={(o) => !o && setRenaming(null)}>
+                <DialogContent className="sm:max-w-md">
+                    <form onSubmit={saveRename} className="space-y-4">
+                        <DialogHeader>
+                            <DialogTitle>Rename category</DialogTitle>
+                            <DialogDescription>Past bills keep the name they were made with.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-2">
+                            <Label htmlFor="rename-category">Category name</Label>
+                            <Input
+                                id="rename-category"
+                                value={newName}
+                                onChange={(e) => {
+                                    setNewName(e.target.value);
+                                    setRenameError(undefined);
+                                }}
+                                required
+                            />
+                            <InputError message={renameError} />
+                        </div>
+                        <DialogFooter className="gap-2">
+                            <Button type="button" variant="secondary" onClick={() => setRenaming(null)}>
+                                Cancel
+                            </Button>
+                            <Button disabled={!newName.trim()}>Save</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
             {canManage && (
                 <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
                     <div className="grid gap-2">

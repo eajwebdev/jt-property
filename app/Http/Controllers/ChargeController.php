@@ -12,6 +12,7 @@ use App\Models\RentalAgreement;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -20,6 +21,8 @@ class ChargeController extends Controller
     /** Add-ons, one-time charges and categories. Everyone signed in sees their properties' charges; only the owner changes them. */
     public function index(Request $request): Response
     {
+        Gate::authorize('viewAny', ChargeCategory::class);
+
         $user = $request->user();
         $today = today()->toDateString();
         $canManage = $user->can('owner');

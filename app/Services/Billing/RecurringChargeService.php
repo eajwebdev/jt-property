@@ -17,6 +17,11 @@ class RecurringChargeService
      */
     public function linesFor(RentalAgreement $agreement, BillingCycle $cycle): Collection
     {
+        // A transfer ends the carried charge on the old agreement and restarts it on the new one:
+        // in the cycle holding that date only the new agreement bills it.
+        $replaced = $agreement->isReplaced();
+        $agreementEnd = $agreement->end_date?->toDateString();
+
         return RecurringCharge::query()
             ->where('rental_agreement_id', $agreement->id)
             ->where('active', true)
@@ -25,6 +30,11 @@ class RecurringChargeService
             ->orderBy('start_date')
             ->orderBy('id')
             ->get()
+            ->reject(fn (RecurringCharge $c) => $replaced
+                && $c->end_date?->toDateString() === $agreementEnd
+                && $agreementEnd >= $cycle->periodStart->toDateString()
+                && $agreementEnd <= $cycle->periodEnd->toDateString())
+            ->values()
             ->map(fn (RecurringCharge $c) => [
                 'label' => $c->label,
                 'amount_cents' => $c->amount_cents,

@@ -110,6 +110,17 @@ class ChargesHttpTest extends TestCase
         $this->assertSame('2026-12-31', $charge->fresh()->end_date->toDateString());
     }
 
+    public function test_start_date_after_the_agreement_end_is_rejected(): void
+    {
+        $this->actingAs(User::factory()->owner()->create());
+        $this->agreement->update(['end_date' => '2027-06-30']);
+
+        $this->post(route('agreements.recurring-charges.store', $this->agreement), $this->payload(['start_date' => '2027-07-01']))->assertSessionHasErrors('start_date');
+        $charge = $this->recurring();
+        $this->post(route('recurring-charges.end', $charge), ['end_date' => '2026-12-31'])->assertSessionHasNoErrors();
+        $this->assertSame(0, RecurringCharge::where('start_date', '2027-07-01')->count());
+    }
+
     public function test_bad_amounts_are_rejected(): void
     {
         $this->actingAs(User::factory()->owner()->create());

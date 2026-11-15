@@ -3,12 +3,15 @@
 namespace Tests\Feature\Billing;
 
 use App\Enums\RentMode;
+use App\Models\ActivityLog;
 use App\Models\ChargeCategory;
 use App\Models\Property;
 use App\Models\RecurringCharge;
 use App\Models\Tenant;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\Billing\BillingCycleResolver;
+use App\Services\Billing\RecurringChargeService;
 use App\Services\TenancyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -100,5 +103,38 @@ class TransferCarriesRecurringChargesTest extends TestCase
         $this->assertNull($charge->fresh()->end_date);
         $this->assertSame($old->id, $charge->fresh()->rental_agreement_id);
         $this->assertSame(1, RecurringCharge::count());
+    }
+
+    public function test_in_the_transfer_cycle_the_add_on_is_billed_only_on_the_new_agreement(): void
+    {
+        $old = $this->start(Tenant::factory()->for($this->property)->create(), $this->unit('A1'));
+        $this->charge($old);
+
+        $new = app(TenancyService::class)->transfer($old, $this->unit('A2'), null, Carbon::parse('2026-11-16'));
+
+        $resolver = app(BillingCycleResolver::class);
+        $service = app(RecurringChargeService::class);
+        $oldLines = $service->linesFor($old->fresh(), $resolver->cycleFor($old->fresh(), 2026, 11));
+        $newLines = $service->linesFor($new, $resolver->cycleFor($new, 2026, 11));
+
+        $this->assertCount(0, $oldLines);
+        $this->assertSame([20000], $newLines->pluck('amount_cents')->all());
+        // Earlier cycles of the old agreement still carry it once.
+        $this->assertCount(1, $service->linesFor($old->fresh(), $resolver->cycleFor($old->fresh(), 2026, 10)));
+    }
+
+    public function test_audit_separates_moved_and_copied_charges(): void
+    {
+        $old = $this->start(Tenant::factory()->for($this->property)->create(), $this->unit('A1'));
+        $copied = $this->charge($old);
+        $moved = $this->charge($old, ['label' => 'Later', 'start_date' => '2026-12-01']);
+
+        $new = app(TenancyService::class)->transfer($old, $this->unit('A2'), null, Carbon::parse('2026-11-16'));
+
+        $new_ = ActivityLog::where('action', 'agreement.transferred')->firstOrFail()->properties['new'];
+        $this->assertSame([$moved->id], $new_['moved_recurring_charge_ids']);
+        $this->assertCount(1, $new_['copied_recurring_charge_ids']);
+        $this->assertSame($new->id, $new_['recurring_charges_agreement_id']);
+        $this->assertNotContains($copied->id, $new_['copied_recurring_charge_ids']);
     }
 }

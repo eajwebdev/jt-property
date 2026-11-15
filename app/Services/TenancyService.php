@@ -289,12 +289,15 @@ class TenancyService
                 ]);
             }
 
-            $carriedCharges = $this->carryRecurringCharges($agreement, $new, $start, $last);
+            ['moved' => $movedCharges, 'copied' => $copiedCharges] = $this->carryRecurringCharges($agreement, $new, $start, $last);
 
             Audit::log('agreement.transferred', $agreement, [
                 'old' => ['rental_agreement_id' => $agreement->id, 'unit_id' => $agreement->unit_id, 'bed_id' => $agreement->bed_id, 'end_date' => $last, 'rent_cents' => $oldRentCents],
                 'new' => [
-                    'carried_recurring_charge_ids' => $carriedCharges,
+                    'moved_recurring_charge_ids' => $movedCharges,
+                    'copied_recurring_charge_ids' => $copiedCharges,
+                    'recurring_charges_agreement_id' => $new->id,
+                    'recurring_charges_from_agreement_id' => $agreement->id,
                     'rental_agreement_id' => $new->id, 'unit_id' => $new->unit_id, 'bed_id' => $new->bed_id, 'start_date' => $start, 'rent_cents' => $rentCents,
                     'carried_rates' => $laterRates->map(fn ($r) => ['effective_from' => $r->effective_from->toDateString(), 'rent_cents' => $r->rent_cents])->values()->all(),
                 ],
@@ -308,21 +311,24 @@ class TenancyService
     /**
      * Move the old agreement's active add-ons to the new one: the old charge ends the day before $start and a
      * copy starts on $start (same category, label, amount and end). A charge that has not started yet simply
-     * moves. Charges that already ended before $start or are switched off stay put. Returns the new charge ids.
+     * moves. Charges that already ended before $start or are switched off stay put.
+     * Returns the ids of moved charges (same row, new agreement) and of copies (new rows).
      *
-     * @return int[]
+     * @return array{moved: int[], copied: int[]}
      */
     private function carryRecurringCharges(RentalAgreement $old, RentalAgreement $new, string $start, string $last): array
     {
-        $carried = [];
+        $moved = $copied = [];
         $charges = $old->recurringCharges()->where('active', true)
             ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $start))
             ->orderBy('id')->lockForUpdate()->get();
 
         foreach ($charges as $charge) {
             if ($charge->start_date->toDateString() >= $start) {
+                // Safe to move: ending it at $last would break the end >= start CHECK, and a charge that starts
+                // on/after the transfer date cannot be on any invoice yet (billing is blocked before that date).
                 $charge->update(['rental_agreement_id' => $new->id]);
-                $carried[] = $charge->id;
+                $moved[] = $charge->id;
 
                 continue;
             }
@@ -335,10 +341,10 @@ class TenancyService
                 'end_date' => $charge->end_date?->toDateString(),
             ]);
             $charge->update(['end_date' => $last]);
-            $carried[] = $copy->id;
+            $copied[] = $copy->id;
         }
 
-        return $carried;
+        return ['moved' => $moved, 'copied' => $copied];
     }
 
     /** A security deposit is a liability record only: it never changes rent or any balance here. */

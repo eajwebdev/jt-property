@@ -32,6 +32,10 @@ class RecurringChargeController extends Controller
             throw ValidationException::withMessages(['agreement' => 'This rental has ended. Add the charge to the current rental instead.']);
         }
 
+        if ($agreement->end_date !== null && $data['start_date'] > $agreement->end_date->toDateString()) {
+            throw ValidationException::withMessages(['start_date' => 'The rental ends on '.$agreement->end_date->toDateString().'. Pick a start date on or before that.']);
+        }
+
         $charge = DB::transaction(function () use ($agreement, $data) {
             $charge = $agreement->recurringCharges()->create([
                 'charge_category_id' => $data['charge_category_id'],
