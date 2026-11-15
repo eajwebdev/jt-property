@@ -123,4 +123,15 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Demo Seed Password
+    |--------------------------------------------------------------------------
+    |
+    | Password used by DatabaseSeeder. Required outside local/testing.
+    |
+    */
+
+    'seed_password' => env('SEED_PASSWORD'),
+
 ];

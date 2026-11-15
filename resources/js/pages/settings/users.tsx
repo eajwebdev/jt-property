@@ -1,15 +1,17 @@
 import InputError from '@/components/input-error';
 import HeadingSmall from '@/components/heading-small';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { type BreadcrumbItem, type User } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import { type BreadcrumbItem, type SharedData, type User } from '@/types';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { FormEventHandler, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Users', href: '/settings/users' }];
 
@@ -18,12 +20,58 @@ type Role = User['role'];
 const roleHelp: Record<Role, string> = {
     owner: 'Owner: full access, including managing users.',
     staff: 'Staff: day-to-day work such as tenants, billing and payments.',
-    accountant: 'Accountant: reviews financial records and reports.',
+    accountant: 'Accountant: read-only access to financial records and reports. Cannot change anything.',
 };
 
-type ListedUser = Pick<User, 'id' | 'name' | 'email' | 'role' | 'created_at'>;
+type ListedUser = Pick<User, 'id' | 'name' | 'email' | 'role' | 'created_at'> & { deactivated_at: string | null };
+
+function UserActions({ user, isSelf }: { user: ListedUser; isSelf: boolean }) {
+    const active = user.deactivated_at === null;
+    const [open, setOpen] = useState(false);
+
+    const send = (action: 'users.deactivate' | 'users.reactivate') =>
+        router.patch(route(action, user.id), {}, { preserveScroll: true, onFinish: () => setOpen(false) });
+
+    if (!active) {
+        return (
+            <Button variant="outline" size="sm" onClick={() => send('users.reactivate')}>
+                Reactivate
+            </Button>
+        );
+    }
+
+    if (isSelf) {
+        return null;
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                    Deactivate
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Deactivate {user.name}?</DialogTitle>
+                    <DialogDescription>They will be signed out and can't sign in until reactivated. Their history stays.</DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button variant="secondary">Cancel</Button>
+                    </DialogClose>
+                    <Button variant="destructive" onClick={() => send('users.deactivate')}>
+                        Deactivate
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 export default function Users({ users }: { users: ListedUser[] }) {
+    const { auth, flash, errors: pageErrors } = usePage<SharedData>().props;
+    const rowError = (pageErrors as Record<string, string>).role ?? (pageErrors as Record<string, string>).user;
     const { data, setData, post, errors, processing, reset, recentlySuccessful } = useForm({
         name: '',
         email: '',
@@ -49,6 +97,17 @@ export default function Users({ users }: { users: ListedUser[] }) {
                 <div className="space-y-6">
                     <HeadingSmall title="Users" description="People who can sign in to this system" />
 
+                    {flash.success && (
+                        <Alert role="status">
+                            <AlertDescription>{flash.success}</AlertDescription>
+                        </Alert>
+                    )}
+                    {rowError && (
+                        <Alert variant="destructive" role="alert">
+                            <AlertDescription>{rowError}</AlertDescription>
+                        </Alert>
+                    )}
+
                     <div className="overflow-x-auto rounded-lg border">
                         <table className="w-full text-sm">
                             <thead className="bg-muted/50 text-left">
@@ -56,6 +115,8 @@ export default function Users({ users }: { users: ListedUser[] }) {
                                     <th scope="col" className="px-3 py-2 font-medium">Name</th>
                                     <th scope="col" className="px-3 py-2 font-medium">Email</th>
                                     <th scope="col" className="px-3 py-2 font-medium">Role</th>
+                                    <th scope="col" className="px-3 py-2 font-medium">Status</th>
+                                    <th scope="col" className="px-3 py-2 font-medium"><span className="sr-only">Actions</span></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -64,9 +125,31 @@ export default function Users({ users }: { users: ListedUser[] }) {
                                         <td className="px-3 py-2">{user.name}</td>
                                         <td className="px-3 py-2">{user.email}</td>
                                         <td className="px-3 py-2">
-                                            <Badge variant={user.role === 'owner' ? 'default' : 'secondary'} className="capitalize">
-                                                {user.role}
-                                            </Badge>
+                                            <Select
+                                                value={user.role}
+                                                onValueChange={(role) =>
+                                                    router.patch(route('users.update', user.id), { name: user.name, role }, { preserveScroll: true })
+                                                }
+                                            >
+                                                <SelectTrigger className="h-8 w-32" aria-label={`Role for ${user.name}`}>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="owner">Owner</SelectItem>
+                                                    <SelectItem value="staff">Staff</SelectItem>
+                                                    <SelectItem value="accountant">Accountant</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {user.deactivated_at ? (
+                                                <Badge variant="secondary">Deactivated</Badge>
+                                            ) : (
+                                                <Badge className="border-transparent bg-success text-success-foreground">Active</Badge>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2 text-right">
+                                            <UserActions user={user} isSelf={user.id === auth.user.id} />
                                         </td>
                                     </tr>
                                 ))}

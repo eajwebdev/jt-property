@@ -36,7 +36,9 @@ Created by `php artisan migrate --seed`. Password is `password` unless you set `
 | Staff | staff@jt.test |
 | Accountant | accountant@jt.test |
 
-There is no public sign-up. The owner adds users under Settings > Users.
+There is no public sign-up. The owner adds users under Settings > Users. Users are deactivated, never deleted, so payment and audit history stays intact (a deactivated user is signed out and cannot sign in until reactivated).
+
+Until SMTP is configured, password-reset emails are written to `storage/logs/laravel.log` (`MAIL_MAILER=log`).
 
 ## Tests
 
