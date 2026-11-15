@@ -1,7 +1,11 @@
 # JT Property — Brand Guidelines
 
-> Official logo files were not supplied. Placeholder SVGs in `public/branding/` use this palette.
-> Replace them with the real assets (same file names) and re-check colours against the logo.
+> Official assets (from `JT_Property_Branding_Assets.zip`) live in `public/branding/`:
+> `jt-logo-horizontal.{webp,png}`, `jt-app-icon.{webp,png}`, `jt-badge.{webp,png}`, `jt-favicon-badge.ico`;
+> `public/favicon.ico` (16–256px) and `public/apple-touch-icon.png`. Statement visual reference:
+> `docs/reference/monthly-bill-visual-reference.png` (fictional mockup — layout reference only).
+> The logo's navy/green/mint match the palette below. The horizontal logo has an opaque light
+> background: on dark surfaces always place it on a white panel. Use `.webp` on the web, `.png` in PDFs.
 
 ## Personality & voice
 - Trustworthy, calm, practical. Audience: Filipino landlords and staff, often non-technical.
