@@ -3,6 +3,7 @@
 use App\Http\Controllers\ChargeCategoryController;
 use App\Http\Controllers\ChargeController;
 use App\Http\Controllers\CollectionsController;
+use App\Http\Controllers\InvoiceStatementController;
 use App\Http\Controllers\OccupancyController;
 use App\Http\Controllers\OneTimeChargeController;
 use App\Http\Controllers\OpeningBalanceController;
@@ -63,6 +64,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('payments/{payment}/approve', [PaymentController::class, 'approve'])->name('payments.approve');
     Route::post('payments/{payment}/reverse', [PaymentController::class, 'reverse'])->name('payments.reverse');
     Route::post('payments/{payment}/allocate', [PaymentController::class, 'allocate'])->name('payments.allocate');
+    Route::get('invoices/{invoice}/statement', [InvoiceStatementController::class, 'show'])->name('invoices.statement');
+    Route::get('invoices/{invoice}/statement.pdf', [InvoiceStatementController::class, 'download'])->name('invoices.statement.pdf');
+    Route::get('invoices/{invoice}/statement-copy.pdf', [InvoiceStatementController::class, 'copy'])->name('invoices.statement.copy');
     Route::post('charge-categories', [ChargeCategoryController::class, 'store'])->name('charge-categories.store');
     Route::patch('charge-categories/{category}', [ChargeCategoryController::class, 'update'])->name('charge-categories.update');
 });
