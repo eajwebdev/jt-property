@@ -53,8 +53,7 @@ export function useAppearance() {
         const savedAppearance = (localStorage.getItem('appearance') as Appearance | null) || 'system';
         setAppearance(savedAppearance);
         applyTheme(savedAppearance);
-
-        return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
+        // No cleanup: the system-theme listener is app-wide (registered once by initializeTheme).
     }, []);
 
     return { appearance, updateAppearance };

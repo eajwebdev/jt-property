@@ -28,6 +28,32 @@ class MoneyTest extends TestCase
         $this->assertSame('₱1,000,000.00', Money::format(100000000));
     }
 
+    public function test_to_cents_accepts_proper_thousands_grouping(): void
+    {
+        $this->assertSame(123456789, Money::toCents('1,234,567.89'));
+        $this->assertSame(1234567, Money::toCents('12345.67'));
+    }
+
+    public function test_to_cents_rejects_comma_used_as_decimal_separator(): void
+    {
+        // "18,00" must never silently become ₱1,800.00
+        $this->expectException(InvalidArgumentException::class);
+        Money::toCents('18,00');
+    }
+
+    public function test_to_cents_rejects_absurdly_long_amounts(): void
+    {
+        // 14 peso digits would overflow integer centavos math; cap well above any real rent.
+        $this->expectException(InvalidArgumentException::class);
+        Money::toCents('12345678901234');
+    }
+
+    public function test_to_cents_rejects_misplaced_commas(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        Money::toCents('1,8,00');
+    }
+
     public function test_to_cents_accepts_comma_grouped_strings(): void
     {
         $this->assertSame(180000, Money::toCents('1,800'));
