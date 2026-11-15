@@ -35,7 +35,7 @@ class UnitController extends Controller
     {
         Gate::authorize('update', $unit);
 
-        DB::transaction(function () use ($request, $unit) {
+        $unit = DB::transaction(function () use ($request, $unit) {
             $unit = Unit::lockForUpdate()->findOrFail($unit->id);
             $data = $request->validated();
 
@@ -51,6 +51,8 @@ class UnitController extends Controller
                     'new' => $changes,
                 ]);
             }
+
+            return $unit;
         });
 
         return back()->with('success', "Room {$unit->code} was saved.");

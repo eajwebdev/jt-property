@@ -255,6 +255,38 @@ class PropertyTest extends TestCase
         $this->assertSame(1, ActivityLog::where('action', 'property.staff_changed')->count());
     }
 
+    public function test_update_without_staff_ids_keeps_assigned_staff(): void
+    {
+        $property = Property::factory()->create();
+        $staff = User::factory()->create();
+        $property->users()->attach($staff);
+        $payload = $this->propertyPayload(['code' => $property->code]);
+        unset($payload['staff_ids']);
+
+        $this->actingAs(User::factory()->owner()->create())->put(route('properties.update', $property), $payload)->assertSessionHasNoErrors();
+
+        $this->assertTrue($property->users()->whereKey($staff->id)->exists());
+    }
+
+    public function test_staff_viewer_does_not_get_staff_names(): void
+    {
+        $property = Property::factory()->create();
+        $staff = User::factory()->create();
+        $property->users()->attach($staff);
+
+        $this->actingAs($staff)->get(route('properties.show', $property))
+            ->assertInertia(fn (Assert $page) => $page->where('canManage', false)->where('staff', []));
+    }
+
+    public function test_unit_update_flash_uses_new_code(): void
+    {
+        $unit = Unit::factory()->create(['code' => 'OLD1', 'capacity' => 1]);
+
+        $this->actingAs(User::factory()->owner()->create())
+            ->put(route('units.update', $unit), $this->unitPayload(['code' => 'NEW1', 'capacity' => 1, 'rent_mode' => 'whole']))
+            ->assertSessionHas('success', 'Room NEW1 was saved.');
+    }
+
     public function test_only_staff_role_users_can_be_assigned(): void
     {
         $accountant = User::factory()->accountant()->create();

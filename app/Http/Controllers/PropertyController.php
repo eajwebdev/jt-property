@@ -107,11 +107,13 @@ class PropertyController extends Controller
                 ];
             });
 
+        $canManage = request()->user()->can('update', $property);
+
         return Inertia::render('properties/show', [
             'property' => array_merge($property->only(['id', 'name', 'code', 'address', 'description', 'amenities']), ['type' => $property->type->value]),
             'units' => $units,
-            'staff' => $property->users()->orderBy('name')->get(['users.id', 'users.name']),
-            'canManage' => request()->user()->can('update', $property),
+            'staff' => $canManage ? $property->users()->orderBy('name')->get(['users.id', 'users.name']) : [],
+            'canManage' => $canManage,
         ]);
     }
 
@@ -138,7 +140,9 @@ class PropertyController extends Controller
                 ]);
             }
 
-            $this->syncStaff($property, $data['staff_ids'] ?? []);
+            if (array_key_exists('staff_ids', $data)) {
+                $this->syncStaff($property, $data['staff_ids']);
+            }
         });
 
         return redirect()->route('properties.show', $property)->with('success', "{$property->name} was saved.");
