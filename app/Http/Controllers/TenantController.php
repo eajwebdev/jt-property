@@ -10,7 +10,6 @@ use App\Http\Requests\UpdateTenantRequest;
 use App\Models\Occupancy;
 use App\Models\Property;
 use App\Models\RentalAgreement;
-use App\Models\RentRate;
 use App\Models\Tenant;
 use App\Models\Unit;
 use App\Support\Audit;
@@ -61,7 +60,7 @@ class TenantController extends Controller
         $occupancies = Occupancy::query()
             ->activeOn($today)
             ->whereIn('tenant_id', $tenants->pluck('id'))
-            ->with(['unit:id,code', 'bed:id,label', 'rentalAgreement:id,due_day'])
+            ->with(['unit:id,code', 'bed:id,label', 'rentalAgreement:id,due_day,billing_account_id', 'rentalAgreement.billingAccount:id,payer_tenant_id', 'rentalAgreement.billingAccount.payer:id,full_name'])
             ->orderBy('id')
             ->get()
             ->groupBy('tenant_id');
@@ -73,18 +72,11 @@ class TenantController extends Controller
             ->get()
             ->groupBy('tenant_id');
 
-        $rents = RentRate::query()
-            ->whereIn('rental_agreement_id', $occupancies->flatten()->pluck('rental_agreement_id')->filter()->unique())
-            ->where('effective_from', '<=', $today->toDateString())
-            ->orderBy('effective_from')
-            ->get()
-            ->groupBy('rental_agreement_id')
-            ->map(fn ($rates) => $rates->last()->rent_cents);
-
+        $rents = RentalAgreement::currentRents($occupancies->flatten()->where('is_payer', true)->pluck('rentalAgreement')->filter(), $today);
         $tenants->through(function (Tenant $tenant) use ($occupancies, $rents, $upcoming) {
             $current = $occupancies->get($tenant->id)?->first();
             $next = $upcoming->get($tenant->id)?->first();
-            $rent = $current?->rental_agreement_id ? $rents->get($current->rental_agreement_id) : null;
+            $rent = $current?->is_payer ? ($rents[$current->rental_agreement_id] ?? null) : null;
 
             return [
                 'id' => $tenant->id,
@@ -94,7 +86,9 @@ class TenantController extends Controller
                 'property' => $tenant->property->name,
                 'room' => $current ? $current->unit->code.($current->bed ? ' / '.$current->bed->label : '') : null,
                 'rent' => $rent === null ? null : Money::format($rent),
-                'due_day' => $current?->rentalAgreement?->due_day,
+                'due_day' => $current?->is_payer ? $current->rentalAgreement?->due_day : null,
+                // Residents do not pay: show who does instead of rent and due day.
+                'paid_by' => $current && ! $current->is_payer ? $current->rentalAgreement?->billingAccount?->payer?->full_name : null,
                 'status' => $tenant->archived_at ? 'archived' : ($current ? 'active' : ($next ? 'upcoming' : 'no_room')),
                 'moving_in' => $current || $tenant->archived_at ? null : $next?->move_in_date->toDateString(),
             ];
@@ -137,41 +131,41 @@ class TenantController extends Controller
         $today = today()->toDateString();
 
         $accounts = $tenant->billingAccounts()
-            ->with(['agreements.unit:id,code', 'agreements.bed:id,label', 'agreements.rentRates', 'deposits'])
+            ->with(['agreements.unit:id,code', 'agreements.bed:id,label', 'agreements.rentRates', 'agreements.replacedBy:id,replaces_agreement_id', 'deposits'])
             ->orderBy('id')
-            ->get()
-            ->map(fn ($account) => [
-                'id' => $account->id,
-                'account_no' => $account->account_no,
-                'status' => $account->status->value,
-                'agreements' => $account->agreements->map(fn ($a) => [
-                    'id' => $a->id,
-                    'room' => $a->unit->code.($a->bed ? ' / '.$a->bed->label : ''),
-                    'due_day' => $a->due_day,
-                    'start_date' => $a->start_date->toDateString(),
-                    'end_date' => $a->end_date?->toDateString(),
-                    // Dates decide: an end date in the past means ended even if the status column was not updated yet.
-                    'status' => $a->end_date !== null && $a->end_date->toDateString() < $today ? 'ended' : $a->status->value,
-                    'open' => $a->end_date === null || $a->end_date->toDateString() >= $today,
-                    'whole' => $a->bed_id === null,
-                    // Same rule as RentalAgreement::wasTransferred(), on the already-loaded agreements.
-                    'replaced' => $a->end_date !== null && $account->agreements->contains(fn ($o) => $o->id !== $a->id && $o->start_date->toDateString() === $a->end_date->copy()->addDay()->toDateString()),
-                    'current_rent_cents' => ($a->rentRates->sortBy('effective_from')->filter(fn ($r) => $r->effective_from->toDateString() <= $today)->last() ?? $a->rentRates->sortBy('effective_from')->first())?->rent_cents,
-                    'rates' => $a->rentRates->sortByDesc('effective_from')->values()->map(fn ($r) => [
-                        'id' => $r->id,
-                        'rent' => Money::format($r->rent_cents),
-                        'effective_from' => $r->effective_from->toDateString(),
-                        'reason' => $r->reason,
-                    ]),
+            ->get();
+        $rents = RentalAgreement::currentRents($accounts->pluck('agreements')->flatten(), $today);
+        $accounts = $accounts->map(fn ($account) => [
+            'id' => $account->id,
+            'account_no' => $account->account_no,
+            'status' => $account->status->value,
+            'agreements' => $account->agreements->map(fn ($a) => [
+                'id' => $a->id,
+                'room' => $a->unit->code.($a->bed ? ' / '.$a->bed->label : ''),
+                'due_day' => $a->due_day,
+                'start_date' => $a->start_date->toDateString(),
+                'end_date' => $a->end_date?->toDateString(),
+                // Dates decide: an end date in the past means ended even if the status column was not updated yet.
+                'status' => $a->end_date !== null && $a->end_date->toDateString() < $today ? 'ended' : $a->status->value,
+                'open' => $a->end_date === null || $a->end_date->toDateString() >= $today,
+                'whole' => $a->bed_id === null,
+                'replaced' => $a->isReplaced(),
+                'current_rent_cents' => $rents[$a->id] ?? null,
+                'rates' => $a->rentRates->sortByDesc('effective_from')->values()->map(fn ($r) => [
+                    'id' => $r->id,
+                    'rent' => Money::format($r->rent_cents),
+                    'effective_from' => $r->effective_from->toDateString(),
+                    'reason' => $r->reason,
                 ]),
-                'deposits' => $account->deposits->map(fn ($d) => [
-                    'id' => $d->id,
-                    'amount' => Money::format($d->amount_cents),
-                    'received_on' => $d->received_on->toDateString(),
-                    'status' => $d->status->value,
-                    'notes' => $d->notes,
-                ]),
-            ]);
+            ]),
+            'deposits' => $account->deposits->map(fn ($d) => [
+                'id' => $d->id,
+                'amount' => Money::format($d->amount_cents),
+                'received_on' => $d->received_on->toDateString(),
+                'status' => $d->status->value,
+                'notes' => $d->notes,
+            ]),
+        ]);
 
         $occupancies = $tenant->occupancies()
             ->with(['unit:id,code', 'bed:id,label'])
@@ -183,6 +177,7 @@ class TenantController extends Controller
                 'move_in_date' => $o->move_in_date->toDateString(),
                 'move_out_date' => $o->move_out_date?->toDateString(),
                 'is_payer' => $o->is_payer,
+                'open' => $o->move_out_date === null || $o->move_out_date->toDateString() >= $today,
             ]);
 
         $user = request()->user();
@@ -281,17 +276,20 @@ class TenantController extends Controller
     {
         Gate::authorize('archive', $tenant);
 
-        $hasAgreement = $tenant->billingAccounts()
-            ->whereHas('agreements', fn ($a) => $a->currentOrFuture())
-            ->exists();
-
-        if ($hasAgreement || $tenant->occupancies()->currentOrFuture()->exists()) {
-            throw ValidationException::withMessages([
-                'archive' => 'This tenant still has a rental or a room. End the rental and move them out first.',
-            ]);
-        }
-
         DB::transaction(function () use ($tenant) {
+            // Lock first so a rental started at the same moment cannot slip in after the check.
+            $tenant = Tenant::lockForUpdate()->findOrFail($tenant->id);
+
+            $hasAgreement = $tenant->billingAccounts()
+                ->whereHas('agreements', fn ($a) => $a->currentOrFuture())
+                ->exists();
+
+            if ($hasAgreement || $tenant->occupancies()->currentOrFuture()->exists()) {
+                throw ValidationException::withMessages([
+                    'archive' => 'This tenant still has a rental or a room. End the rental and move them out first.',
+                ]);
+            }
+
             $tenant->update(['archived_at' => now()]);
             Audit::log('tenant.archived', $tenant, ['full_name' => $tenant->full_name]);
         });
@@ -311,6 +309,8 @@ class TenantController extends Controller
     {
         return [
             'tenant' => $tenant ? array_merge($tenant->only(['id', ...self::FIELDS]), ['preferred_delivery' => $tenant->preferred_delivery->value]) : null,
+            // Rooms and accounts belong to the property, so it cannot change once there is history (see UpdateTenantRequest).
+            'propertyLocked' => $tenant && ($tenant->occupancies()->exists() || $tenant->billingAccounts()->exists()),
             'properties' => $this->accessibleProperties($request)->get(['properties.id', 'properties.name']),
             'deliveryMethods' => collect(DeliveryMethod::cases())->map->value,
         ];

@@ -191,7 +191,7 @@ export function ChangeRentDialog({ agreement, open, onOpenChange, today }: BaseP
             processing={f.processing}
             canReview={!!cents && f.data.reason.trim() !== ''}
             confirmLabel="Yes, change rent"
-            alerts={[]}
+            alerts={[f.errors.agreement]}
             onSave={() => f.save(route('agreements.rent.store', agreement.id), () => onOpenChange(false))}
             summary={[
                 ['Room', agreement.room],
@@ -286,6 +286,55 @@ export function MoveOutDialog({ agreement, open, onOpenChange, today }: BaseProp
                 <InputError message={f.errors.move_out_date} />
             </div>
             <ReasonField id="moveout-reason" value={f.data.reason} onChange={(v) => f.setData('reason', v)} error={f.errors.reason} />
+        </ActionDialog>
+    );
+}
+
+/** A resident leaving on their own; the rental and the payer carry on. */
+export function MoveOutResidentDialog({
+    occupancy,
+    open,
+    onOpenChange,
+    today,
+}: BaseProps & { occupancy: { id: number; room: string; move_in_date: string; tenant: string } }) {
+    const f = useActionForm(open, { move_out_date: today < occupancy.move_in_date ? occupancy.move_in_date : today, reason: '' });
+
+    return (
+        <ActionDialog
+            open={open}
+            onOpenChange={onOpenChange}
+            title={`Move ${occupancy.tenant} out of room ${occupancy.room}`}
+            description="Choose their last day in the room. The rental and the person paying carry on, and their place is free from the next day."
+            confirming={f.confirming}
+            setConfirming={f.setConfirming}
+            processing={f.processing}
+            canReview={f.data.move_out_date !== '' && f.data.reason.trim() !== ''}
+            confirmLabel="Yes, save move-out"
+            alerts={[f.errors.occupancy, f.errors.agreement]}
+            onSave={() => f.save(route('occupancies.move-out', occupancy.id), () => onOpenChange(false))}
+            summary={[
+                ['Person', occupancy.tenant],
+                ['Room', occupancy.room],
+                ['Last day in the room', formatDate(f.data.move_out_date)],
+                ['Place free from', f.data.move_out_date ? formatDate(addDays(f.data.move_out_date, 1)) : '-'],
+                ['Reason', f.data.reason],
+            ]}
+        >
+            <div className="grid gap-2">
+                <Label htmlFor="resident-moveout-date">Last day in the room</Label>
+                <Input
+                    id="resident-moveout-date"
+                    type="date"
+                    value={f.data.move_out_date}
+                    min={occupancy.move_in_date}
+                    max={addDays(today, 365)}
+                    onChange={(e) => f.setData('move_out_date', e.target.value)}
+                    className="max-w-48"
+                    required
+                />
+                <InputError message={f.errors.move_out_date} />
+            </div>
+            <ReasonField id="resident-moveout-reason" value={f.data.reason} onChange={(v) => f.setData('reason', v)} error={f.errors.reason} />
         </ActionDialog>
     );
 }

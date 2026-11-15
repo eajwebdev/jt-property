@@ -1,4 +1,4 @@
-import { ChangeRentDialog, MoveOutDialog, RecordDepositDialog, TransferDialog } from '@/components/agreement-action-dialogs';
+import { ChangeRentDialog, MoveOutDialog, MoveOutResidentDialog, RecordDepositDialog, TransferDialog } from '@/components/agreement-action-dialogs';
 import StartRentalDialog, { type RentalOptions } from '@/components/start-rental-dialog';
 import TenantStatusBadge, { NoEmailBadge } from '@/components/tenant-status-badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -60,7 +60,7 @@ interface Props {
         archived_at: string | null;
     };
     accounts: Account[];
-    occupancies: { id: number; room: string; move_in_date: string; move_out_date: string | null; is_payer: boolean }[];
+    occupancies: { id: number; room: string; move_in_date: string; move_out_date: string | null; is_payer: boolean; open: boolean }[];
     canEdit: boolean;
     canArchive: boolean;
     canStartRental: boolean;
@@ -85,6 +85,8 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
     // The last chosen action stays mounted while the dialog closes so its exit animation can play.
     const [action, setAction] = useState<Action | null>(null);
     const [actionOpen, setActionOpen] = useState(false);
+    const [resident, setResident] = useState<Props['occupancies'][number] | null>(null);
+    const [residentOpen, setResidentOpen] = useState(false);
     const openAction = (a: Action) => {
         setAction(a);
         setActionOpen(true);
@@ -288,6 +290,18 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                                     <span className="text-muted-foreground">
                                         {formatDate(o.move_in_date)} to {o.move_out_date ? formatDate(o.move_out_date) : 'now'}
                                     </span>
+                                    {canManageRentals && o.open && !o.is_payer && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                                setResident(o);
+                                                setResidentOpen(true);
+                                            }}
+                                        >
+                                            <DoorOpen /> Move out
+                                        </Button>
+                                    )}
                                 </li>
                             ))}
                         </ul>
@@ -305,6 +319,14 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                 />
             )}
 
+            {canManageRentals && resident && (
+                <MoveOutResidentDialog
+                    occupancy={{ id: resident.id, room: resident.room, move_in_date: resident.move_in_date, tenant: tenant.full_name }}
+                    open={residentOpen}
+                    onOpenChange={setResidentOpen}
+                    today={today}
+                />
+            )}
             {canManageRentals && action?.kind === 'rent' && (
                 <ChangeRentDialog agreement={action.agreement} open={actionOpen} onOpenChange={setActionOpen} today={today} />
             )}

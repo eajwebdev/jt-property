@@ -175,8 +175,16 @@ export default function Index({ tenants, filters, properties, canCreate }: Props
                                             </th>
                                             <td className="px-3 py-2">{t.property}</td>
                                             <td className="px-3 py-2">{t.room ?? '-'}</td>
-                                            <td className="px-3 py-2">{t.rent ?? '-'}</td>
-                                            <td className="px-3 py-2">{t.due_day ?? '-'}</td>
+                                            {t.paid_by ? (
+                                                <td colSpan={2} className="px-3 py-2 text-muted-foreground">
+                                                    Resident (paid by {t.paid_by})
+                                                </td>
+                                            ) : (
+                                                <>
+                                                    <td className="px-3 py-2">{t.rent ?? '-'}</td>
+                                                    <td className="px-3 py-2">{t.due_day ?? '-'}</td>
+                                                </>
+                                            )}
                                             <td className="px-3 py-2">{t.email ?? <NoEmailBadge />}</td>
                                             <td className="px-3 py-2">
                                                 <TenantStatusBadge status={t.status} date={t.moving_in} />
@@ -200,6 +208,7 @@ export default function Index({ tenants, filters, properties, canCreate }: Props
                                         {t.property}
                                         {t.room && ` - ${t.room}`}
                                     </p>
+                                    {t.paid_by && <p className="text-sm text-muted-foreground">Resident (paid by {t.paid_by})</p>}
                                     {t.rent && (
                                         <p className="text-sm">
                                             {t.rent} a month{t.due_day && `, due on day ${t.due_day}`}

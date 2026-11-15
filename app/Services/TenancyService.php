@@ -41,7 +41,7 @@ class TenancyService
      * The body of startAgreement, shared with transfer(); must run inside a transaction.
      * $account forces the billing account (transfer); null finds or creates the payer's active one.
      */
-    private function open(Tenant $payer, Unit $unit, ?Bed $bed, int $rentCents, int $dueDay, CarbonInterface $startDate, array $options, ?BillingAccount $account = null): RentalAgreement
+    private function open(Tenant $payer, Unit $unit, ?Bed $bed, int $rentCents, int $dueDay, CarbonInterface $startDate, array $options, ?BillingAccount $account = null, ?RentalAgreement $replaces = null): RentalAgreement
     {
         $unit = Unit::with('property')->lockForUpdate()->findOrFail($unit->id);
         $start = $startDate->toDateString();
@@ -76,6 +76,7 @@ class TenancyService
             'end_date' => $end,
             'status' => AgreementStatus::Active,
             'override_reason' => $override,
+            'replaces_agreement_id' => $replaces?->id,
         ]);
 
         $agreement->rentRates()->create(['rent_cents' => $rentCents, 'effective_from' => $start, 'created_by' => auth()->id()]);
@@ -93,7 +94,8 @@ class TenancyService
 
         $depositCents = $options['deposit_cents'] ?? null;
         if ($depositCents) {
-            $account->deposits()->create(['rental_agreement_id' => $agreement->id, 'amount_cents' => $depositCents, 'received_on' => $start]);
+            // Never dated in the future: a deposit is money already received.
+            $this->recordDeposit($account, $depositCents, Carbon::parse(min($start, today()->toDateString())), $agreement);
         }
 
         Audit::log('agreement.created', $agreement, [
@@ -123,6 +125,8 @@ class TenancyService
     {
         return DB::transaction(function () use ($agreement, $rentCents, $effectiveFrom, $reason) {
             $agreement = RentalAgreement::lockForUpdate()->findOrFail($agreement->id);
+            $this->guardNotTransferred($agreement);
+            $this->guardNotEnded($agreement);
             $from = $effectiveFrom->toDateString();
 
             $error = match (true) {
@@ -191,6 +195,48 @@ class TenancyService
     }
 
     /**
+     * A resident (not the payer) leaves on their own: $date is their last day, the place is free from the next day.
+     * The rental and the payer carry on. Owner only.
+     */
+    public function moveOutResident(Occupancy $occupancy, CarbonInterface $date, ?string $reason = null): void
+    {
+        abort_unless(auth()->user()?->isOwner(), 403);
+
+        DB::transaction(function () use ($occupancy, $date, $reason) {
+            // Same order as the other flows: the unit row first, then the people.
+            Unit::lockForUpdate()->findOrFail($occupancy->unit_id);
+            Tenant::lockForUpdate()->findOrFail($occupancy->tenant_id);
+            $occupancy = Occupancy::with('rentalAgreement')->lockForUpdate()->findOrFail($occupancy->id);
+            $agreement = $occupancy->rentalAgreement;
+            $this->guardNotTransferred($agreement);
+            $last = $date->toDateString();
+            $current = $occupancy->move_out_date?->toDateString();
+            $agreementEnd = $agreement->end_date?->toDateString();
+
+            $error = match (true) {
+                $occupancy->is_payer => ['occupancy', 'The person paying moves out with the rental. Use Move out on the rental instead.'],
+                $last < $occupancy->move_in_date->toDateString() => ['move_out_date', 'The move-out date cannot be before they moved in ('.$occupancy->move_in_date->toDateString().').'],
+                $last > today()->addDays(365)->toDateString() => ['move_out_date', 'The move-out date must be within the next 12 months.'],
+                $agreementEnd !== null && $last > $agreementEnd => ['move_out_date', "The rental ends on {$agreementEnd}. Pick that date or earlier."],
+                $current !== null && $current < today()->toDateString() => ['move_out_date', 'This person has already moved out.'],
+                $current !== null && $last > $current => ['move_out_date', "This person already moves out on {$current}. Pick that date or earlier."],
+                default => null,
+            };
+            if ($error) {
+                throw ValidationException::withMessages([$error[0] => $error[1]]);
+            }
+
+            $occupancy->update(['move_out_date' => $last]);
+
+            Audit::log('occupancy.moved_out', $occupancy, [
+                'old' => ['move_out_date' => $current],
+                'new' => ['move_out_date' => $last, 'tenant_id' => $occupancy->tenant_id, 'rental_agreement_id' => $agreement->id],
+                'reason' => $reason,
+            ]);
+        });
+    }
+
+    /**
      * Move a rental to another room/bed from $date: the old agreement ends the day before, a new one for the
      * same billing account starts on $date with the same settings and the given or current rent, and the
      * residents move along. All of startAgreement's rules apply; any failure rolls everything back.
@@ -232,7 +278,7 @@ class TenancyService
                 'prorate' => $agreement->prorate,
                 'end_date' => $plannedEnd !== null && $plannedEnd >= $start ? $plannedEnd : null,
                 'resident_tenant_ids' => $residentIds,
-            ], $agreement->billingAccount);
+            ], $agreement->billingAccount, $agreement);
 
             foreach ($laterRates as $rate) {
                 $new->rentRates()->create([
@@ -289,8 +335,16 @@ class TenancyService
     /** A transfer replaced this agreement; changes belong on the new one. */
     private function guardNotTransferred(RentalAgreement $agreement): void
     {
-        if ($agreement->wasTransferred()) {
+        if ($agreement->isReplaced()) {
             throw ValidationException::withMessages(['agreement' => 'This rental was transferred; manage the new one.']);
+        }
+    }
+
+    /** An agreement whose last day has passed is history: nothing on it changes any more. */
+    private function guardNotEnded(RentalAgreement $agreement): void
+    {
+        if ($agreement->end_date !== null && $agreement->end_date->toDateString() < today()->toDateString()) {
+            throw ValidationException::withMessages(['agreement' => 'This rental has already ended.']);
         }
     }
 

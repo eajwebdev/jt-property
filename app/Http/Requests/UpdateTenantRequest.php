@@ -12,4 +12,17 @@ class UpdateTenantRequest extends StoreTenantRequest
 
         return $user->can('update', $tenant) && $user->can('create', [$tenant::class, $this->integer('property_id') ?: null]);
     }
+
+    /** @return array<int, callable> */
+    public function after(): array
+    {
+        return [function ($validator) {
+            $tenant = $this->route('tenant');
+
+            // Rooms and accounts are tied to the property: after the first rental, moving property is a transfer.
+            if ($this->integer('property_id') !== (int) $tenant->property_id && ($tenant->occupancies()->exists() || $tenant->billingAccounts()->exists())) {
+                $validator->errors()->add('property_id', 'This tenant has rentals at their current property. Start a transfer instead.');
+            }
+        }];
+    }
 }

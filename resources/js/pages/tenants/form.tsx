@@ -25,12 +25,13 @@ interface Props {
     } | null;
     properties: { id: number; name: string }[];
     deliveryMethods: string[];
+    propertyLocked: boolean;
 }
 
 const textareaClass =
     'border-input placeholder:text-muted-foreground focus-visible:ring-ring/50 flex min-h-20 w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs outline-none focus-visible:ring-[3px] md:text-sm';
 
-export default function Form({ tenant, properties, deliveryMethods }: Props) {
+export default function Form({ tenant, properties, deliveryMethods, propertyLocked }: Props) {
     const editing = tenant !== null;
     const { data, setData, post, put, processing, errors } = useForm({
         property_id: tenant?.property_id ?? (properties.length === 1 ? properties[0].id : 0),
@@ -67,8 +68,8 @@ export default function Form({ tenant, properties, deliveryMethods }: Props) {
                 ) : (
                     <div className="grid gap-2">
                         <Label htmlFor="property_id">Property</Label>
-                        <Select value={data.property_id ? String(data.property_id) : ''} onValueChange={(v) => setData('property_id', Number(v))}>
-                            <SelectTrigger id="property_id">
+                        <Select value={data.property_id ? String(data.property_id) : ''} onValueChange={(v) => setData('property_id', Number(v))} disabled={propertyLocked}>
+                            <SelectTrigger id="property_id" aria-describedby={propertyLocked ? 'property-help' : undefined}>
                                 <SelectValue placeholder="Choose a property" />
                             </SelectTrigger>
                             <SelectContent>
@@ -79,6 +80,11 @@ export default function Form({ tenant, properties, deliveryMethods }: Props) {
                                 ))}
                             </SelectContent>
                         </Select>
+                        {propertyLocked && (
+                            <p id="property-help" className="text-sm text-muted-foreground">
+                                This tenant has rentals at their current property. Start a transfer instead.
+                            </p>
+                        )}
                         <InputError message={errors.property_id} />
                     </div>
                 )}

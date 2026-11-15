@@ -74,6 +74,7 @@ export interface TenantRow {
     room: string | null;
     rent: string | null;
     due_day: number | null;
+    paid_by: string | null;
     status: 'active' | 'upcoming' | 'no_room' | 'archived';
     moving_in: string | null;
 }

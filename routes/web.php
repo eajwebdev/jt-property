@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\OccupancyController;
 use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\RentalAgreementController;
 use App\Http\Controllers\SecurityDepositController;
@@ -24,6 +25,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('agreements/{agreement}/rent', [RentalAgreementController::class, 'changeRent'])->name('agreements.rent.store');
     Route::post('agreements/{agreement}/move-out', [RentalAgreementController::class, 'moveOut'])->name('agreements.move-out');
     Route::post('agreements/{agreement}/transfer', [RentalAgreementController::class, 'transfer'])->name('agreements.transfer');
+    Route::post('occupancies/{occupancy}/move-out', [OccupancyController::class, 'moveOut'])->name('occupancies.move-out');
     Route::post('accounts/{account}/deposits', [SecurityDepositController::class, 'store'])->name('accounts.deposits.store');
 });
 

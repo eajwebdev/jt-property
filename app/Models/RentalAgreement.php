@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 class RentalAgreement extends Model
 {
@@ -17,7 +19,7 @@ class RentalAgreement extends Model
 
     protected $fillable = [
         'billing_account_id', 'unit_id', 'bed_id', 'due_day', 'cycle_start_day', 'issue_lead_days',
-        'prorate', 'start_date', 'end_date', 'status', 'override_reason',
+        'prorate', 'start_date', 'end_date', 'status', 'override_reason', 'replaces_agreement_id',
     ];
 
     protected function casts(): array
@@ -73,13 +75,16 @@ class RentalAgreement extends Model
         return $query->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', today()->toDateString()));
     }
 
-    /** True when a transfer replaced this agreement: another one on the same account starts the day after it ends. */
-    public function wasTransferred(): bool
+    /** The agreement a transfer created to replace this one (explicit link, never guessed from dates). */
+    public function replacedBy(): HasOne
     {
-        return $this->end_date !== null && RentalAgreement::where('billing_account_id', $this->billing_account_id)
-            ->whereKeyNot($this->id)
-            ->whereDate('start_date', $this->end_date->copy()->addDay()->toDateString())
-            ->exists();
+        return $this->hasOne(self::class, 'replaces_agreement_id');
+    }
+
+    /** True when a transfer replaced this agreement; changes belong on the new one. */
+    public function isReplaced(): bool
+    {
+        return $this->relationLoaded('replacedBy') ? $this->replacedBy !== null : $this->replacedBy()->exists();
     }
 
     public function isWholeUnit(): bool
@@ -90,9 +95,24 @@ class RentalAgreement extends Model
     /** Rent in centavos from the latest rate effective on or before $date, or null if none. */
     public function rentOn(CarbonInterface|string $date): ?int
     {
-        return $this->rentRates()
+        return static::currentRents(collect([$this]), $date)[$this->id] ?? null;
+    }
+
+    /**
+     * The one "rent in force" rule, for many agreements in a single query: the latest rate with
+     * effective_from <= $date. Agreements with no such rate are left out.
+     *
+     * @param  Collection<int, RentalAgreement>  $agreements
+     * @return array<int, int> agreement id => rent in centavos
+     */
+    public static function currentRents(Collection $agreements, CarbonInterface|string $date): array
+    {
+        return RentRate::query()
+            ->whereIn('rental_agreement_id', $agreements->pluck('id')->unique())
             ->where('effective_from', '<=', Carbon::parse($date)->toDateString())
-            ->orderByDesc('effective_from')
-            ->value('rent_cents');
+            ->orderBy('effective_from')
+            ->get(['rental_agreement_id', 'rent_cents'])
+            ->mapWithKeys(fn ($r) => [$r->rental_agreement_id => $r->rent_cents])
+            ->all();
     }
 }
