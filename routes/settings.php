@@ -3,6 +3,7 @@
 use App\Http\Controllers\Settings\AppearanceController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Settings\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -20,4 +21,9 @@ Route::middleware('auth')->group(function () {
         return Inertia::render('settings/appearance');
     })->name('appearance');
     Route::patch('settings/appearance', [AppearanceController::class, 'update'])->name('appearance.update');
+
+    Route::middleware('role:owner')->group(function () {
+        Route::get('settings/users', [UserController::class, 'index'])->name('users.index');
+        Route::post('settings/users', [UserController::class, 'store'])->name('users.store');
+    });
 });
