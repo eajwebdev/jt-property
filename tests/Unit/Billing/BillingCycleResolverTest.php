@@ -85,7 +85,7 @@ class BillingCycleResolverTest extends TestCase
     {
         $this->assertSame('2026-12-05', $this->resolver->dueDate(5, $this->d('2026-11-15'))->toDateString());
         $this->assertSame('2026-11-15', $this->resolver->dueDate(15, $this->d('2026-11-15'))->toDateString());
-        // Next month is shorter than the due day: clamped there too (Jan 20 cycle, due 31 -> Jan 31 is after start).
+        // Cycle starts Jan 31 and due day 30 has already passed in January, so it rolls to February and is clamped to Feb 28.
         $this->assertSame('2026-02-28', $this->resolver->dueDate(30, $this->d('2026-01-31'))->toDateString());
     }
 
@@ -265,5 +265,46 @@ class BillingCycleResolverTest extends TestCase
         $this->expectException(DomainException::class);
 
         $this->resolver->rentLine($a, $this->resolver->cycleFor($a, 2026, 11));
+    }
+
+    public function test_prorated_bed_agreement_description_puts_bed_before_days(): void
+    {
+        $unit = Unit::factory()->create(['code' => 'A101']);
+        $bed = Bed::factory()->create(['unit_id' => $unit->id, 'label' => 'Bed 2']);
+        $a = $this->agreement(['bed_id' => $bed->id, 'start_date' => '2026-11-19', 'prorate' => true], 600_000, null, $unit);
+
+        $line = $this->resolver->rentLine($a, $this->resolver->cycleFor($a, 2026, 11));
+
+        $this->assertSame('Monthly Rental – Room A101 Bed 2 (12/30 days)', $line['description']);
+        $this->assertSame(240_000, $line['amount_cents']);
+    }
+
+    public function test_cycle_from_jan_15_to_feb_14_has_31_days(): void
+    {
+        $a = $this->agreement(['cycle_start_day' => 15]);
+
+        $c = $this->resolver->cycleFor($a, 2026, 1);
+
+        $this->assertSame('2026-02-14', $c->periodEnd->toDateString());
+        $this->assertSame(31, $c->periodDays());
+    }
+
+    public function test_due_day_29_on_a_15th_cycle_is_clamped_in_february(): void
+    {
+        $a = $this->agreement(['cycle_start_day' => 15, 'due_day' => 29]);
+
+        $this->assertSame('2026-02-28', $this->resolver->cycleFor($a, 2026, 2)->dueDate->toDateString());
+        $this->assertSame('2028-02-29', $this->resolver->cycleFor($a, 2028, 2)->dueDate->toDateString());
+    }
+
+    public function test_prorated_rent_not_divisible_by_days_rounds_half_up_to_exact_centavos(): void
+    {
+        // Dec has 31 days: 250,000 * 7 / 31 = 56,451.61... -> 56,452
+        $a = $this->agreement(['start_date' => '2026-12-25', 'prorate' => true], 250_000);
+
+        $line = $this->resolver->rentLine($a, $this->resolver->cycleFor($a, 2026, 12));
+
+        $this->assertSame(56_452, $line['amount_cents']);
+        $this->assertSame(7, $this->resolver->cycleFor($a, 2026, 12)->coveredDays($a));
     }
 }

@@ -45,11 +45,11 @@ class BillingCycleResolver
         $prorated = $partial && ($agreement->prorate || $this->isTransferCycle($agreement, $cycle));
 
         $description = 'Monthly Rental – Room '.$agreement->unit->code;
-        if ($prorated) {
-            $description .= " ({$covered}/{$cycle->periodDays()} days)";
-        }
         if ($agreement->bed_id !== null) {
             $description .= ' '.$agreement->bed->label;
+        }
+        if ($prorated) {
+            $description .= " ({$covered}/{$cycle->periodDays()} days)";
         }
 
         return [
