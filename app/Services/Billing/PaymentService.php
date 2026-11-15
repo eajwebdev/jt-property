@@ -98,6 +98,8 @@ class PaymentService
             Audit::log('payment.approved', $row, ['amount_cents' => $row->amount_cents, 'ledger_entry_id' => $entry->id, 'ack_number' => $row->ack_number]);
 
             $this->allocateWithin($row, $manual !== null && $manual !== [] ? $manual : $this->plan($row->billingAccount, $row->amount_cents)->all());
+            // A manual split can leave part of the payment unallocated; put it to work on what is still owed.
+            $this->applyCredit($row->billingAccount);
         });
 
         return $payment->refresh();
@@ -260,8 +262,38 @@ class PaymentService
         Audit::log('payment.allocated', $payment, ['allocations' => $lines]);
     }
 
-    /** Serialises every money change on one account (payments, allocations, refunds, write-offs). */
-    private function lockAccount(int $accountId): void
+    /**
+     * Puts unallocated money from approved payments (oldest paid_on, then id) onto open debts, oldest debt first.
+     * Call after anything that creates a debt (a charge or an opening balance).
+     */
+    public function applyCredit(BillingAccount $account): void
+    {
+        DB::transaction(function () use ($account) {
+            $this->lockAccount($account->id);
+            $payments = Payment::where('billing_account_id', $account->id)->where('status', 'approved')->orderBy('paid_on')->orderBy('id')->get();
+            foreach ($payments as $payment) {
+                $left = $this->unallocated($payment);
+                if ($left <= 0) {
+                    continue;
+                }
+                $plan = $this->plan($account, $left);
+                if ($plan->isEmpty()) {
+                    return;
+                }
+                $this->allocateWithin($payment, $plan->all());
+            }
+        });
+    }
+
+    /** What was forgiven (not paid) on one debt, to show next to a bill that reads Paid. */
+    public function writtenOff(LedgerEntry $debit): int
+    {
+        return -(int) LedgerEntry::where('type', LedgerEntryType::Writeoff)->where('source_type', $debit->getMorphClass())->where('source_id', $debit->id)
+            ->whereDoesntHave('reversal')->sum('amount_cents');
+    }
+
+    /** Serialises every money change on one account (payments, allocations, refunds, write-offs, charges, opening balances). */
+    public function lockAccount(int $accountId): void
     {
         BillingAccount::lockForUpdate()->findOrFail($accountId);
     }

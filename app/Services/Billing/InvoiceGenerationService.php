@@ -10,6 +10,7 @@ use App\Models\BillingBatchItem;
 use App\Models\Invoice;
 use App\Models\LedgerEntry;
 use App\Models\OneTimeCharge;
+use App\Models\PaymentAllocation;
 use App\Models\RentalAgreement;
 use App\Models\User;
 use App\Models\UtilityAllocation;
@@ -36,6 +37,7 @@ class InvoiceGenerationService
         private ReceivableLedgerService $ledger,
         private InvoiceNumberGenerator $numbers,
         private UtilityAllocationService $utilities,
+        private PaymentService $payments,
     ) {}
 
     /** @param  list<int>|null  $agreementIds */
@@ -84,6 +86,7 @@ class InvoiceGenerationService
         }
 
         DB::transaction(function () use ($invoice, $reason, $by) {
+            $this->payments->lockAccount($invoice->billing_account_id);
             $invoice = Invoice::lockForUpdate()->findOrFail($invoice->id);
             if ($invoice->status !== InvoiceStatus::Finalized) {
                 throw ValidationException::withMessages(['invoice' => 'This bill is already void.']);
@@ -92,6 +95,8 @@ class InvoiceGenerationService
             $entry = LedgerEntry::where('invoice_id', $invoice->id)->whereIn('type', [LedgerEntryType::Charge, LedgerEntryType::Credit])->first();
             if ($entry !== null) {
                 $this->ledger->reverse($entry, "Void {$invoice->number}: {$reason}");
+                // Money that paid this bill becomes unallocated credit again (the rows stay, marked reversed).
+                PaymentAllocation::where('ledger_entry_id', $entry->id)->whereNull('reversed_at')->update(['reversed_at' => now()]);
             }
 
             $invoice->update(['status' => InvoiceStatus::Void, 'voided_at' => now(), 'void_reason' => $reason, 'voided_by' => $by->id]);
@@ -146,6 +151,7 @@ class InvoiceGenerationService
     private function bill(int $agreementId, BillingBatch $batch): array
     {
         $agreement = RentalAgreement::lockForUpdate()->findOrFail($agreementId);
+        $this->payments->lockAccount($agreement->billing_account_id);
         $agreement->load(['unit', 'bed', 'replacedBy', 'billingAccount.payer', 'billingAccount.agreements:id,billing_account_id']);
 
         $cycle = $this->cycles->cycleFor($agreement, $batch->year, $batch->month);
@@ -196,6 +202,8 @@ class InvoiceGenerationService
         // Positive total owes more, negative (credits beat charges) is a credit, zero posts nothing.
         if ($total !== 0) {
             $this->ledger->post($agreement->billingAccount, $total > 0 ? LedgerEntryType::Charge : LedgerEntryType::Credit, $total, $cycle->issueDate, $invoice, "Invoice {$invoice->number}");
+            // Credit already on the account (an overpayment) goes to the new bill.
+            $this->payments->applyCredit($agreement->billingAccount);
         }
 
         $this->consume($lines, $invoice);

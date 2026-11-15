@@ -6,6 +6,7 @@ use App\Enums\LedgerEntryType;
 use App\Models\BillingAccount;
 use App\Models\LedgerEntry;
 use App\Models\OpeningBalance;
+use App\Models\PaymentAllocation;
 use App\Support\Audit;
 use App\Support\Money;
 use Carbon\CarbonInterface;
@@ -24,7 +25,7 @@ class OpeningBalanceService
 {
     public const CSV_HEADER = ['account_no', 'amount', 'as_of', 'description'];
 
-    public function __construct(private ReceivableLedgerService $ledger) {}
+    public function __construct(private ReceivableLedgerService $ledger, private PaymentService $payments) {}
 
     /**
      * Saves a pending draft; nothing is posted yet.
@@ -72,6 +73,7 @@ class OpeningBalanceService
     {
         $entry = DB::transaction(function () use ($ob) {
             $row = OpeningBalance::lockForUpdate()->findOrFail($ob->id);
+            $this->payments->lockAccount($row->billing_account_id);
 
             if ($row->status === 'approved') {
                 return LedgerEntry::findOrFail($row->ledger_entry_id);
@@ -83,6 +85,7 @@ class OpeningBalanceService
             $entry = $this->ledger->post($row->billingAccount, LedgerEntryType::Opening, $row->amount_cents, $row->as_of, $row, $row->description);
             $row->update(['status' => 'approved', 'approved_by' => auth()->id(), 'ledger_entry_id' => $entry->id]);
             Audit::log('opening_balance.approved', $row, ['amount_cents' => $row->amount_cents, 'ledger_entry_id' => $entry->id]);
+            $this->payments->applyCredit($row->billingAccount);
 
             return $entry;
         });
@@ -96,12 +99,15 @@ class OpeningBalanceService
     {
         DB::transaction(function () use ($ob, $reason) {
             $row = OpeningBalance::lockForUpdate()->findOrFail($ob->id);
+            $this->payments->lockAccount($row->billing_account_id);
 
             if ($row->status === 'reversed') {
                 throw ValidationException::withMessages(['opening_balance' => 'This opening balance was already reversed.']);
             }
             if ($row->status === 'approved') {
                 $this->ledger->reverse(LedgerEntry::findOrFail($row->ledger_entry_id), $reason);
+                // Money that paid this debt becomes unallocated credit again.
+                PaymentAllocation::where('ledger_entry_id', $row->ledger_entry_id)->whereNull('reversed_at')->update(['reversed_at' => now()]);
             }
 
             $was = $row->status;

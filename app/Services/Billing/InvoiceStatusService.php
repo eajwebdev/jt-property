@@ -12,6 +12,14 @@ class InvoiceStatusService
 {
     public function __construct(private PaymentService $payments) {}
 
+    /** Part of the bill that was forgiven rather than paid (the bill can still read Paid). */
+    public function writtenOffCents(Invoice $invoice): int
+    {
+        $charge = LedgerEntry::where('invoice_id', $invoice->id)->where('type', LedgerEntryType::Charge)->orderBy('id')->first();
+
+        return $charge === null ? 0 : $this->payments->writtenOff($charge);
+    }
+
     /** @return 'paid'|'partial'|'unpaid'|'overdue'|'void' */
     public function statusFor(Invoice $invoice): string
     {

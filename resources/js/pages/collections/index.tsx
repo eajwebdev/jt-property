@@ -1,3 +1,4 @@
+import { RefundDialog, WriteOffDialog, type DebitOption } from '@/components/account-money-dialogs';
 import { RecordPaymentDialog } from '@/components/record-payment-dialog';
 import { selectClass } from '@/components/recurring-charge-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -22,6 +23,7 @@ interface Row {
     balance: string;
     is_credit: boolean;
     oldest_due: string | null;
+    debits: DebitOption[];
     aging: string | null;
 }
 interface Props {
@@ -29,6 +31,7 @@ interface Props {
     properties: { id: number; name: string }[];
     filters: { status: string | null; property_id: number | null };
     canRecord: boolean;
+    canManage: boolean;
     today: string;
     methods: string[];
 }
@@ -48,9 +51,11 @@ function Aging({ value }: { value: string | null }) {
     return <Badge variant={value === 'current' ? 'outline' : value === '1-30' ? 'secondary' : 'destructive'}>{agingLabels[value]}</Badge>;
 }
 
-export default function CollectionsIndex({ rows, properties, filters, canRecord, today, methods }: Props) {
+export default function CollectionsIndex({ rows, properties, filters, canRecord, canManage, today, methods }: Props) {
     const { flash, auth } = usePage<SharedData>().props;
     const [paying, setPaying] = useState<{ open: boolean; accountId: number | null }>({ open: false, accountId: null });
+    const [refunding, setRefunding] = useState<Row | null>(null);
+    const [writingOff, setWritingOff] = useState<Row | null>(null);
     const isOwner = (auth.user as { role?: string }).role === 'owner';
 
     const go = (next: Partial<{ status: string; property_id: string }>) =>
@@ -130,6 +135,20 @@ export default function CollectionsIndex({ rows, properties, filters, canRecord,
                                             Record payment
                                         </Button>
                                     )}
+                                    {canManage && (
+                                        <div className="flex gap-2">
+                                            {r.is_credit && (
+                                                <Button variant="ghost" className="h-11 flex-1" onClick={() => setRefunding(r)}>
+                                                    Refund
+                                                </Button>
+                                            )}
+                                            {r.debits.length > 0 && (
+                                                <Button variant="ghost" className="h-11 flex-1" onClick={() => setWritingOff(r)}>
+                                                    Write off
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
                                 </li>
                             ))}
                         </ul>
@@ -165,10 +184,20 @@ export default function CollectionsIndex({ rows, properties, filters, canRecord,
                                                 <Aging value={r.aging} />
                                             </td>
                                             {canRecord && (
-                                                <td className="p-3 text-right">
+                                                <td className="flex justify-end gap-1 p-3 text-right">
                                                     <Button size="sm" variant="outline" onClick={() => setPaying({ open: true, accountId: r.account_id })}>
                                                         Record payment
                                                     </Button>
+                                                    {canManage && r.is_credit && (
+                                                        <Button size="sm" variant="ghost" onClick={() => setRefunding(r)}>
+                                                            Refund
+                                                        </Button>
+                                                    )}
+                                                    {canManage && r.debits.length > 0 && (
+                                                        <Button size="sm" variant="ghost" onClick={() => setWritingOff(r)}>
+                                                            Write off
+                                                        </Button>
+                                                    )}
                                                 </td>
                                             )}
                                         </tr>
@@ -180,6 +209,8 @@ export default function CollectionsIndex({ rows, properties, filters, canRecord,
                 )}
             </div>
 
+            {refunding && <RefundDialog open onOpenChange={(o) => !o && setRefunding(null)} accountId={refunding.account_id} tenant={refunding.tenant} credit={refunding.balance} />}
+            {writingOff && <WriteOffDialog open onOpenChange={(o) => !o && setWritingOff(null)} tenant={writingOff.tenant} debits={writingOff.debits} />}
             <RecordPaymentDialog
                 open={paying.open}
                 onOpenChange={(o) => setPaying((p) => ({ ...p, open: o }))}

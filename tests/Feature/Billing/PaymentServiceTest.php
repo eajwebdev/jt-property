@@ -12,7 +12,9 @@ use App\Models\PaymentAllocation;
 use App\Models\Property;
 use App\Models\RentalAgreement;
 use App\Models\User;
+use App\Services\Billing\InvoiceGenerationService;
 use App\Services\Billing\InvoiceStatusService;
+use App\Services\Billing\OpeningBalanceService;
 use App\Services\Billing\PaymentService;
 use App\Services\Billing\ReceivableLedgerService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -171,7 +173,8 @@ class PaymentServiceTest extends TestCase
             $this->assertArrayHasKey('allocations', $e->errors());
         }
         $this->assertSame(0, $this->service->remaining($debit));
-        $this->assertEquals(70000, $second->allocations()->sum('amount_cents'));
+        // 70,000 manual, then the remainder is auto-applied to the invoice (50,000 owed).
+        $this->assertEquals(120000, $second->allocations()->sum('amount_cents'));
     }
 
     public function test_reverse_restores_invoice_status_and_keeps_allocation_rows(): void
@@ -304,5 +307,82 @@ class PaymentServiceTest extends TestCase
     {
         $this->expectException(ValidationException::class);
         $this->pay(1000, ['paid_on' => '2026-11-17']);
+    }
+
+    public function test_voiding_an_invoice_releases_the_payment_allocation(): void
+    {
+        [$invoice] = $this->invoice(100000);
+        $payment = $this->pay(100000);
+        $this->assertSame(0, $this->service->unallocated($payment));
+
+        app(InvoiceGenerationService::class)->void($invoice, 'Wrong amount', $this->owner);
+
+        $this->assertSame(100000, $this->service->unallocated($payment));
+        $this->assertSame(-100000, $this->ledger->balance($this->account));
+        $opening = $this->opening(30000);
+        $this->service->allocate($payment, [$opening->id => 30000]);
+        $this->assertSame(70000, $this->service->unallocated($payment));
+    }
+
+    public function test_credit_is_applied_to_a_later_invoice(): void
+    {
+        $payment = $this->pay(150000);
+        [$invoice] = $this->invoice(100000);
+
+        $this->service->applyCredit($this->account);
+
+        $this->assertSame('paid', app(InvoiceStatusService::class)->statusFor($invoice));
+        $this->assertSame(50000, $this->service->unallocated($payment));
+        $this->service->applyCredit($this->account);
+        $this->assertEquals(100000, $payment->allocations()->sum('amount_cents'));
+    }
+
+    public function test_manual_partial_split_has_its_remainder_applied_oldest_first(): void
+    {
+        $opening = $this->opening(100000);
+        [$invoice, $charge] = $this->invoice(100000);
+
+        $payment = $this->pay(150000, ['allocations' => [$charge->id => 60000]]);
+
+        $by = $payment->allocations()->pluck('amount_cents', 'ledger_entry_id');
+        $this->assertSame(60000, $by[$charge->id]);
+        $this->assertSame(90000, $by[$opening->id]);
+        $this->assertSame('partial', app(InvoiceStatusService::class)->statusFor($invoice));
+    }
+
+    public function test_approving_an_opening_balance_applies_waiting_credit(): void
+    {
+        $payment = $this->pay(30000);
+        $svc = app(OpeningBalanceService::class);
+
+        $ob = $svc->draft($this->account, 100000, Carbon::parse('2026-10-31'), null, null);
+        $svc->approve($ob);
+
+        $this->assertSame(0, $this->service->unallocated($payment));
+        $this->assertSame(70000, $this->ledger->balance($this->account));
+
+        $svc->reverse($ob, 'Mistake');
+        $this->assertSame(30000, $this->service->unallocated($payment));
+    }
+
+    public function test_reference_can_be_reused_after_the_payment_is_reversed(): void
+    {
+        $bounced = $this->pay(1000, ['method' => 'check', 'reference' => 'CHK-9']);
+        $this->service->reverse($bounced, 'Bounced');
+
+        $again = $this->pay(1000, ['method' => 'check', 'reference' => 'CHK-9']);
+
+        $this->assertSame('approved', $again->status);
+    }
+
+    public function test_written_off_amount_is_reported_for_the_invoice(): void
+    {
+        [$invoice, $charge] = $this->invoice(100000);
+        $this->pay(60000);
+        $this->service->writeOff($charge, 40000, 'Forgiven');
+
+        $statuses = app(InvoiceStatusService::class);
+        $this->assertSame('paid', $statuses->statusFor($invoice));
+        $this->assertSame(40000, $statuses->writtenOffCents($invoice));
     }
 }

@@ -11,12 +11,13 @@ use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class PaymentController extends Controller
 {
@@ -43,7 +44,7 @@ class PaymentController extends Controller
                 'amount_cents' => Money::toCents($data['amount']),
                 'proof_path' => $proof,
             ] + $data, $request->user());
-        } catch (ValidationException $e) {
+        } catch (Throwable $e) {
             // Nothing was saved, so the uploaded file would be orphaned.
             if ($proof !== null) {
                 Storage::disk('local')->delete($proof);
@@ -107,7 +108,16 @@ class PaymentController extends Controller
                 'has_proof' => $payment->proof_path !== null,
                 'reverse_reason' => $payment->reverse_reason,
                 'unallocated' => Money::format($this->service->unallocated($payment)),
+                'unallocated_cents' => $this->service->unallocated($payment),
             ],
+            'openDebits' => $payment->status === 'approved' && $user->can('allocate', $payment)
+                ? $this->service->openDebits([$payment->billing_account_id])->map(fn ($d) => [
+                    'id' => $d->id,
+                    'label' => ($d->memo ?: ucfirst($d->type->value)).' due '.Carbon::parse($d->due_date)->format('M j, Y'),
+                    'remaining_cents' => $d->remaining_cents,
+                    'remaining' => Money::format($d->remaining_cents),
+                ])->values()
+                : [],
             'allocations' => $payment->allocations->map(fn ($a) => [
                 'id' => $a->id,
                 'label' => $a->ledgerEntry->memo ?: ucfirst($a->ledgerEntry->type->value),

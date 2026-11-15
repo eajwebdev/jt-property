@@ -1,3 +1,4 @@
+import { AllocateDialog, type DebitOption } from '@/components/account-money-dialogs';
 import InputError from '@/components/input-error';
 import { methodLabels } from '@/components/record-payment-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -31,7 +32,9 @@ interface Props {
         has_proof: boolean;
         reverse_reason: string | null;
         unallocated: string;
+        unallocated_cents: number;
     };
+    openDebits: DebitOption[];
     allocations: { id: number; label: string; date: string; amount: string; reversed: boolean }[];
     canManage: boolean;
 }
@@ -71,9 +74,10 @@ function ReverseDialog({ id, open, onOpenChange }: { id: number; open: boolean; 
     );
 }
 
-export default function PaymentShow({ payment, allocations, canManage }: Props) {
+export default function PaymentShow({ payment, allocations, openDebits, canManage }: Props) {
     const { flash } = usePage<SharedData>().props;
     const [reversing, setReversing] = useState(false);
+    const [allocating, setAllocating] = useState(false);
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Collections', href: '/collections' },
         { title: payment.ack_number ?? 'Payment', href: `/payments/${payment.id}` },
@@ -113,6 +117,11 @@ export default function PaymentShow({ payment, allocations, canManage }: Props) 
                         {payment.status === 'pending' && (
                             <Button className="h-11" onClick={() => router.post(route('payments.approve', payment.id), {}, { preserveScroll: true })}>
                                 Approve and post
+                            </Button>
+                        )}
+                        {payment.status === 'approved' && payment.unallocated_cents > 0 && (
+                            <Button className="h-11" onClick={() => setAllocating(true)}>
+                                Allocate
                             </Button>
                         )}
                         {payment.status === 'approved' && (
@@ -169,6 +178,7 @@ export default function PaymentShow({ payment, allocations, canManage }: Props) 
                 </section>
             </div>
             <ReverseDialog id={payment.id} open={reversing} onOpenChange={setReversing} />
+            <AllocateDialog open={allocating} onOpenChange={setAllocating} paymentId={payment.id} unallocated={payment.unallocated} debits={openDebits} />
         </AppLayout>
     );
 }

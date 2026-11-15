@@ -153,6 +153,26 @@ class PaymentHttpTest extends TestCase
         $this->get(route('collections.index', ['status' => 'overdue']))->assertInertia(fn (Assert $p) => $p->has('rows', 1));
     }
 
+    public function test_collections_rows_carry_open_debits_for_write_off(): void
+    {
+        $this->get(route('collections.index'))->assertInertia(fn (Assert $p) => $p
+            ->where('rows.0.debits.0.remaining_cents', 180000)
+            ->where('canManage', true)
+        );
+    }
+
+    public function test_owner_allocates_leftover_credit_by_hand_and_staff_cannot(): void
+    {
+        $payment = app(PaymentService::class)->record($this->account, ['amount_cents' => 200000, 'paid_on' => '2026-11-16', 'method' => 'cash'], $this->owner);
+        $this->assertSame(20000, app(PaymentService::class)->unallocated($payment));
+        $opening2 = app(ReceivableLedgerService::class)->post($this->account, LedgerEntryType::Opening, 50000, Carbon::parse('2026-11-01'), $this->account, 'Later');
+        $this->actingAs($this->staff())->post(route('payments.allocate', $payment), ['allocations' => [$opening2->id => '150']])->assertForbidden();
+
+        $this->actingAs($this->owner)->post(route('payments.allocate', $payment), ['allocations' => [$opening2->id => '150']])->assertRedirect();
+
+        $this->assertSame(5000, app(PaymentService::class)->unallocated($payment));
+    }
+
     public function test_payment_detail_page(): void
     {
         $this->post(route('accounts.payments.store', $this->account), $this->payload());
