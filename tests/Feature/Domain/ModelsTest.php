@@ -10,10 +10,12 @@ use App\Models\Occupancy;
 use App\Models\Property;
 use App\Models\RentalAgreement;
 use App\Models\RentRate;
+use App\Models\SecurityDeposit;
 use App\Models\Tenant;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\Audit;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use LogicException;
 use Tests\TestCase;
@@ -119,13 +121,13 @@ class ModelsTest extends TestCase
         $this->assertSame('maintenance', $unit->displayStatus('2026-05-01'));
     }
 
-    public function test_move_out_ends_occupancy_count(): void
+    public function test_move_out_date_is_inclusive(): void
     {
         $unit = Unit::factory()->create(['capacity' => 2]);
         $this->occupy($unit, '2026-01-01', '2026-02-01');
 
-        $this->assertSame(1, $unit->occupiedCountOn('2026-01-31'));
-        $this->assertSame(0, $unit->occupiedCountOn('2026-02-01'));
+        $this->assertSame(1, $unit->occupiedCountOn('2026-02-01'));
+        $this->assertSame(0, $unit->occupiedCountOn('2026-02-02'));
     }
 
     public function test_relations_both_directions(): void
@@ -141,6 +143,55 @@ class ModelsTest extends TestCase
         $this->assertTrue($account->property->billingAccounts->contains($account));
         $this->assertTrue($account->payer->property->tenants->contains($account->payer));
         $this->assertTrue($agreement->unit->property->units->contains($agreement->unit));
+    }
+
+    public function test_rent_rate_is_append_only(): void
+    {
+        $rate = RentRate::factory()->create();
+
+        try {
+            $rate->update(['rent_cents' => 1]);
+            $this->fail('update should throw');
+        } catch (LogicException) {
+            $this->assertNotSame(1, $rate->fresh()->rent_cents);
+        }
+
+        try {
+            $rate->delete();
+            $this->fail('delete should throw');
+        } catch (LogicException) {
+            $this->assertSame(1, RentRate::count());
+        }
+    }
+
+    public function test_account_no_is_not_mass_assignable(): void
+    {
+        $this->assertNotContains('account_no', (new BillingAccount)->getFillable());
+        $account = BillingAccount::factory()->create();
+
+        $this->assertStringStartsWith('JT-', $account->account_no);
+    }
+
+    public function test_check_constraints_reject_bad_rows(): void
+    {
+        $this->assertCheckFails(fn () => Unit::factory()->create(['capacity' => 0]));
+        $this->assertCheckFails(fn () => RentalAgreement::factory()->create(['due_day' => 32]));
+        $this->assertCheckFails(fn () => RentalAgreement::factory()->create(['cycle_start_day' => 29]));
+        $this->assertCheckFails(fn () => RentalAgreement::factory()->create(['issue_lead_days' => 32]));
+        $this->assertCheckFails(fn () => RentalAgreement::factory()->create(['end_date' => '2025-12-31']));
+        $this->assertCheckFails(fn () => RentRate::factory()->create(['rent_cents' => 0]));
+        $this->assertCheckFails(fn () => SecurityDeposit::factory()->create(['amount_cents' => 0]));
+        $this->assertCheckFails(fn () => Occupancy::factory()->create(['move_out_date' => '2025-12-31']));
+    }
+
+    private function assertCheckFails(callable $insert): void
+    {
+        try {
+            $insert();
+            $this->fail('CHECK constraint did not reject the row');
+        } catch (QueryException) {
+            $this->addToAssertionCount(1);
+        }
     }
 
     private function occupy(Unit $unit, string $in, ?string $out = null): void

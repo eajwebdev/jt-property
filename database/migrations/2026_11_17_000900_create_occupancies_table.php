@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -19,6 +20,8 @@ return new class extends Migration
             $table->date('move_out_date')->nullable();
             $table->timestamps();
         });
+
+        DB::statement('ALTER TABLE occupancies ADD CONSTRAINT occupancies_dates CHECK (move_out_date IS NULL OR move_out_date >= move_in_date)');
     }
 
     public function down(): void

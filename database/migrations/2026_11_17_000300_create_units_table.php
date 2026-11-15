@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -22,6 +23,8 @@ return new class extends Migration
             $table->timestamps();
             $table->unique(['property_id', 'code']);
         });
+
+        DB::statement('ALTER TABLE units ADD CONSTRAINT units_capacity_min CHECK (capacity >= 1)');
     }
 
     public function down(): void

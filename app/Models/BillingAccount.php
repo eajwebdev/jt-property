@@ -12,7 +12,7 @@ class BillingAccount extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['property_id', 'payer_tenant_id', 'account_no', 'status'];
+    protected $fillable = ['property_id', 'payer_tenant_id', 'status'];
 
     protected function casts(): array
     {
@@ -22,7 +22,7 @@ class BillingAccount extends Model
     protected static function booted(): void
     {
         static::created(function (BillingAccount $account) {
-            $account->updateQuietly(['account_no' => 'JT-'.str_pad((string) $account->id, 6, '0', STR_PAD_LEFT)]);
+            $account->forceFill(['account_no' => 'JT-'.str_pad((string) $account->id, 6, '0', STR_PAD_LEFT)])->saveQuietly();
         });
     }
 

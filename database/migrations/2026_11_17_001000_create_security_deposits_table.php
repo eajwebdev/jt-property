@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -18,6 +19,8 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
         });
+
+        DB::statement('ALTER TABLE security_deposits ADD CONSTRAINT security_deposits_positive CHECK (amount_cents > 0)');
     }
 
     public function down(): void

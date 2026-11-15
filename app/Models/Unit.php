@@ -45,14 +45,14 @@ class Unit extends Model
         return $this->hasMany(Occupancy::class);
     }
 
-    /** Number of occupancies active on the given date (move-out date is exclusive). */
+    /** Number of occupancies active on the given date (move-out date is inclusive: the tenant still occupies on it). */
     public function occupiedCountOn($date): int
     {
         $date = Carbon::parse($date)->toDateString();
 
         return $this->occupancies()
             ->where('move_in_date', '<=', $date)
-            ->where(fn ($q) => $q->whereNull('move_out_date')->orWhere('move_out_date', '>', $date))
+            ->where(fn ($q) => $q->whereNull('move_out_date')->orWhere('move_out_date', '>=', $date))
             ->count();
     }
 

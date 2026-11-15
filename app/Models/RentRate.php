@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 
 class RentRate extends Model
 {
@@ -18,6 +19,12 @@ class RentRate extends Model
             'rent_cents' => 'integer',
             'effective_from' => 'date',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::updating(fn () => throw new LogicException('Rent rates are append-only.'));
+        static::deleting(fn () => throw new LogicException('Rent rates are append-only.'));
     }
 
     public function rentalAgreement(): BelongsTo
