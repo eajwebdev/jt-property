@@ -65,6 +65,27 @@ export interface UnitRow {
     occupants: { id: number; name: string; bed: string | null }[];
 }
 
+export interface TenantRow {
+    id: number;
+    name: string;
+    email: string | null;
+    mobile: string | null;
+    property: string;
+    room: string | null;
+    rent: string | null;
+    due_day: number | null;
+    status: 'active' | 'no_room' | 'archived';
+}
+
+export interface Paginated<T> {
+    data: T[];
+    from: number | null;
+    to: number | null;
+    total: number;
+    prev_page_url: string | null;
+    next_page_url: string | null;
+}
+
 export interface User {
     id: number;
     name: string;

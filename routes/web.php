@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\PropertyController;
+use App\Http\Controllers\TenantController;
 use App\Http\Controllers\UnitController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -15,6 +16,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::resource('properties', PropertyController::class)->except('destroy');
     Route::resource('properties.units', UnitController::class)->shallow()->only(['store', 'update']);
+    Route::resource('tenants', TenantController::class)->except('destroy');
+    Route::patch('tenants/{tenant}/archive', [TenantController::class, 'archive'])->name('tenants.archive');
 });
 
 require __DIR__.'/settings.php';
