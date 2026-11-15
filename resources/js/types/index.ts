@@ -33,6 +33,8 @@ export interface User {
     name: string;
     email: string;
     avatar?: string;
+    role: 'owner' | 'staff' | 'accountant';
+    appearance: 'light' | 'dark' | 'system';
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;

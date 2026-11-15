@@ -1,4 +1,7 @@
+import { router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
+
+import type { SharedData } from '@/types';
 
 export type Appearance = 'light' | 'dark' | 'system';
 
@@ -26,18 +29,30 @@ export function initializeTheme() {
     mediaQuery.addEventListener('change', handleSystemThemeChange);
 }
 
+// The logged-in user's saved choice wins over whatever this browser remembered.
+export function syncAppearance(mode: Appearance) {
+    localStorage.setItem('appearance', mode);
+    applyTheme(mode);
+}
+
 export function useAppearance() {
     const [appearance, setAppearance] = useState<Appearance>('system');
+    const { auth } = usePage<SharedData>().props;
+    const loggedIn = Boolean(auth?.user);
 
     const updateAppearance = (mode: Appearance) => {
         setAppearance(mode);
-        localStorage.setItem('appearance', mode);
-        applyTheme(mode);
+        syncAppearance(mode);
+
+        if (loggedIn) {
+            router.patch(route('appearance.update'), { appearance: mode }, { preserveScroll: true, preserveState: true });
+        }
     };
 
     useEffect(() => {
-        const savedAppearance = localStorage.getItem('appearance') as Appearance | null;
-        updateAppearance(savedAppearance || 'system');
+        const savedAppearance = (localStorage.getItem('appearance') as Appearance | null) || 'system';
+        setAppearance(savedAppearance);
+        applyTheme(savedAppearance);
 
         return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
     }, []);
