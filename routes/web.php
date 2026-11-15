@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\ChargeCategoryController;
 use App\Http\Controllers\ChargeController;
+use App\Http\Controllers\CollectionsController;
 use App\Http\Controllers\OccupancyController;
 use App\Http\Controllers\OneTimeChargeController;
 use App\Http\Controllers\OpeningBalanceController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\RecurringChargeController;
 use App\Http\Controllers\RentalAgreementController;
@@ -51,6 +53,16 @@ Route::middleware(['auth'])->group(function () {
     Route::post('opening-balances/import', [OpeningBalanceController::class, 'import'])->name('opening-balances.import');
     Route::post('opening-balances/{openingBalance}/approve', [OpeningBalanceController::class, 'approve'])->name('opening-balances.approve');
     Route::post('opening-balances/{openingBalance}/reverse', [OpeningBalanceController::class, 'reverse'])->name('opening-balances.reverse');
+    Route::get('collections', [CollectionsController::class, 'index'])->name('collections.index');
+    Route::get('accounts/{account}/payments/preview', [PaymentController::class, 'preview'])->name('accounts.payments.preview');
+    Route::post('accounts/{account}/payments', [PaymentController::class, 'store'])->name('accounts.payments.store');
+    Route::post('accounts/{account}/refunds', [PaymentController::class, 'refund'])->name('accounts.refunds.store');
+    Route::post('ledger-entries/{entry}/write-off', [PaymentController::class, 'writeOff'])->name('ledger-entries.write-off');
+    Route::get('payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
+    Route::get('payments/{payment}/proof', [PaymentController::class, 'proof'])->name('payments.proof');
+    Route::post('payments/{payment}/approve', [PaymentController::class, 'approve'])->name('payments.approve');
+    Route::post('payments/{payment}/reverse', [PaymentController::class, 'reverse'])->name('payments.reverse');
+    Route::post('payments/{payment}/allocate', [PaymentController::class, 'allocate'])->name('payments.allocate');
     Route::post('charge-categories', [ChargeCategoryController::class, 'store'])->name('charge-categories.store');
     Route::patch('charge-categories/{category}', [ChargeCategoryController::class, 'update'])->name('charge-categories.update');
 });
