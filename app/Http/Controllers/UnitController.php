@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\AgreementStatus;
 use App\Enums\RentMode;
 use App\Http\Requests\StoreUnitRequest;
 use App\Http\Requests\UpdateUnitRequest;
@@ -60,7 +59,7 @@ class UnitController extends Controller
 
     private function guardRentMode(Unit $unit, string $newMode): void
     {
-        if ($unit->rent_mode->value !== $newMode && $unit->agreements()->where('status', AgreementStatus::Active)->exists()) {
+        if ($unit->rent_mode->value !== $newMode && $unit->agreements()->currentOrFuture()->exists()) {
             throw ValidationException::withMessages([
                 'rent_mode' => 'This room has an active rental agreement. End the agreement before changing how rent is charged.',
             ]);

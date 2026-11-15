@@ -157,6 +157,7 @@ class TenancyService
         DB::transaction(function () use ($agreement, $date, $reason) {
             Unit::lockForUpdate()->findOrFail($agreement->unit_id);
             $agreement = RentalAgreement::lockForUpdate()->findOrFail($agreement->id);
+            $this->guardNotTransferred($agreement);
             $last = $date->toDateString();
 
             $error = match (true) {
@@ -171,17 +172,19 @@ class TenancyService
             $old = ['end_date' => $agreement->end_date?->toDateString(), 'status' => $agreement->status->value];
             $this->end($agreement, $last);
 
-            $account = BillingAccount::lockForUpdate()->findOrFail($agreement->billing_account_id);
-            $continues = $account->agreements()->whereKeyNot($agreement->id)
+            // Close the account only once the last day has passed and nothing else on it continues;
+            // a future move-out leaves it active so later bills and transfers still find it.
+            $close = $last < today()->toDateString() && ! RentalAgreement::where('billing_account_id', $agreement->billing_account_id)
+                ->whereKeyNot($agreement->id)
                 ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>', $last))
                 ->exists();
-            if (! $continues) {
-                $account->update(['status' => AccountStatus::Closed]);
+            if ($close) {
+                BillingAccount::whereKey($agreement->billing_account_id)->update(['status' => AccountStatus::Closed]);
             }
 
             Audit::log('agreement.moved_out', $agreement, [
                 'old' => $old,
-                'new' => ['end_date' => $last, 'status' => $agreement->status->value, 'account_closed' => ! $continues],
+                'new' => ['end_date' => $last, 'status' => $agreement->status->value, 'account_closed' => $close],
                 'reason' => $reason,
             ]);
         });
@@ -198,6 +201,7 @@ class TenancyService
             // Unit rows first (id order), then startAgreement's own locks re-take them in this transaction.
             Unit::whereIn('id', [$agreement->unit_id, $toUnit->id])->orderBy('id')->lockForUpdate()->get();
             $agreement = RentalAgreement::with('billingAccount.payer')->lockForUpdate()->findOrFail($agreement->id);
+            $this->guardNotTransferred($agreement);
             $start = $date->toDateString();
             $last = $date->copy()->subDay()->toDateString();
 
@@ -210,7 +214,10 @@ class TenancyService
                 throw ValidationException::withMessages(['transfer_date' => $error]);
             }
 
-            $rentCents = $newRentCents ?? $agreement->rentOn($last);
+            // Rent in force on the move day; without a new rent, later scheduled rates move along too.
+            $oldRentCents = $agreement->rentOn($last);
+            $rentCents = $newRentCents ?? $agreement->rentOn($start);
+            $laterRates = $newRentCents === null ? $agreement->rentRates()->where('effective_from', '>', $start)->orderBy('effective_from')->get() : collect();
             $residentIds = $agreement->occupancies()->where('is_payer', false)
                 ->where(fn ($q) => $q->whereNull('move_out_date')->orWhere('move_out_date', '>', $last))
                 ->pluck('tenant_id')->all();
@@ -218,8 +225,6 @@ class TenancyService
 
             // End the old stay first so the people are free from $date for the shared start rules.
             $this->end($agreement, $last);
-            // A future move-out may already have closed the account; the rental continues in the new room.
-            $agreement->billingAccount->update(['status' => AccountStatus::Active]);
 
             $new = $this->open($agreement->billingAccount->payer, $toUnit, $toBed, $rentCents, $agreement->due_day, $date, [
                 'cycle_start_day' => $agreement->cycle_start_day,
@@ -229,9 +234,21 @@ class TenancyService
                 'resident_tenant_ids' => $residentIds,
             ], $agreement->billingAccount);
 
+            foreach ($laterRates as $rate) {
+                $new->rentRates()->create([
+                    'rent_cents' => $rate->rent_cents,
+                    'effective_from' => $rate->effective_from->toDateString(),
+                    'reason' => trim('Carried from transfer: '.$rate->reason),
+                    'created_by' => auth()->id(),
+                ]);
+            }
+
             Audit::log('agreement.transferred', $agreement, [
-                'old' => ['rental_agreement_id' => $agreement->id, 'unit_id' => $agreement->unit_id, 'bed_id' => $agreement->bed_id, 'end_date' => $last],
-                'new' => ['rental_agreement_id' => $new->id, 'unit_id' => $new->unit_id, 'bed_id' => $new->bed_id, 'start_date' => $start, 'rent_cents' => $rentCents],
+                'old' => ['rental_agreement_id' => $agreement->id, 'unit_id' => $agreement->unit_id, 'bed_id' => $agreement->bed_id, 'end_date' => $last, 'rent_cents' => $oldRentCents],
+                'new' => [
+                    'rental_agreement_id' => $new->id, 'unit_id' => $new->unit_id, 'bed_id' => $new->bed_id, 'start_date' => $start, 'rent_cents' => $rentCents,
+                    'carried_rates' => $laterRates->map(fn ($r) => ['effective_from' => $r->effective_from->toDateString(), 'rent_cents' => $r->rent_cents])->values()->all(),
+                ],
                 'reason' => $reason,
             ]);
 
@@ -267,6 +284,14 @@ class TenancyService
 
             return $deposit;
         });
+    }
+
+    /** A transfer replaced this agreement; changes belong on the new one. */
+    private function guardNotTransferred(RentalAgreement $agreement): void
+    {
+        if ($agreement->wasTransferred()) {
+            throw ValidationException::withMessages(['agreement' => 'This rental was transferred; manage the new one.']);
+        }
     }
 
     /** Why the agreement cannot be given $last as its final day, if anything. Ending is only ever brought forward. */

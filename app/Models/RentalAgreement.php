@@ -67,6 +67,21 @@ class RentalAgreement extends Model
             ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $date));
     }
 
+    /** Agreements still running today or starting later (end date inclusive). Use instead of the status column. */
+    public function scopeCurrentOrFuture(Builder $query): Builder
+    {
+        return $query->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', today()->toDateString()));
+    }
+
+    /** True when a transfer replaced this agreement: another one on the same account starts the day after it ends. */
+    public function wasTransferred(): bool
+    {
+        return $this->end_date !== null && RentalAgreement::where('billing_account_id', $this->billing_account_id)
+            ->whereKeyNot($this->id)
+            ->whereDate('start_date', $this->end_date->copy()->addDay()->toDateString())
+            ->exists();
+    }
+
     public function isWholeUnit(): bool
     {
         return $this->bed_id === null;

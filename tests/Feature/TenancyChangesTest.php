@@ -185,6 +185,28 @@ class TenancyChangesTest extends TestCase
         $this->assertTrue(RentalAgreement::activeOn($last)->whereKey($agreement->id)->exists());
         $this->assertFalse(RentalAgreement::activeOn($last->copy()->addDay())->whereKey($agreement->id)->exists());
         $this->assertFalse(RentalAgreement::activeOn('2025-12-31')->whereKey($agreement->id)->exists());
+        $this->assertSame(AccountStatus::Active, $agreement->billingAccount->status);
+    }
+
+    public function test_once_a_future_move_out_has_passed_the_tenant_can_be_archived_and_the_room_mode_changed(): void
+    {
+        $unit = $this->perBedUnit('A101');
+        $agreement = $this->anaInA101($unit);
+        $tenant = $agreement->billingAccount->payer;
+        $this->service->moveOut($agreement, today()->addDays(5), 'Leaving soon');
+        $unitPayload = ['code' => 'A101', 'capacity' => 4, 'rent_mode' => 'whole', 'status' => 'available'];
+
+        $this->patch(route('tenants.archive', $tenant))->assertSessionHasErrors('archive');
+        $this->put(route('units.update', $unit), $unitPayload)->assertSessionHasErrors('rent_mode');
+
+        $this->travelTo(today()->addDays(6));
+
+        // The status column still says active: only dates decide.
+        $this->assertSame(AgreementStatus::Active, $agreement->fresh()->status);
+        $this->patch(route('tenants.archive', $tenant))->assertSessionHasNoErrors();
+        $this->assertNotNull($tenant->fresh()->archived_at);
+        $this->put(route('units.update', $unit), $unitPayload)->assertSessionHasNoErrors();
+        $this->assertSame(RentMode::Whole, $unit->fresh()->rent_mode);
     }
 
     public function test_move_out_before_start_is_rejected(): void
@@ -287,13 +309,60 @@ class TenancyChangesTest extends TestCase
         $agreement = $this->anaInA101();
         $last = today()->addDays(60);
         $this->service->moveOut($agreement, $last, 'Leaving in two months');
-        $this->assertSame(AccountStatus::Closed, $agreement->billingAccount->fresh()->status);
+        $this->assertSame(AccountStatus::Active, $agreement->billingAccount->fresh()->status);
 
         $new = $this->service->transfer($agreement, $a102, $this->bed($a102, 1), today()->addDays(10), null, 'Change before leaving');
 
         $this->assertSame(AccountStatus::Active, $new->billingAccount->fresh()->status);
+        $this->assertSame(1, BillingAccount::count());
         $this->assertSame($last->toDateString(), $new->end_date->toDateString());
         $this->assertSame($last->toDateString(), $new->occupancies()->sole()->move_out_date->toDateString());
+    }
+
+    public function test_transfer_carries_the_rent_of_the_move_day_and_later_scheduled_rates(): void
+    {
+        $a102 = $this->perBedUnit('A102');
+        $agreement = $this->anaInA101();
+        $this->service->changeRent($agreement, 280000, $this->d('2026-05-01'), 'Yearly increase');
+        $this->service->changeRent($agreement, 300000, $this->d('2026-07-01'), 'Aircon added');
+        $oldRates = RentRate::orderBy('id')->get()->map->getAttributes()->all();
+
+        $new = $this->service->transfer($agreement, $a102, $this->bed($a102, 2), $this->d('2026-05-01'), null, 'Quieter room');
+
+        $this->assertSame(280000, $new->rentOn('2026-05-01'));
+        $this->assertSame(280000, $new->rentOn('2026-06-30'));
+        $this->assertSame(300000, $new->rentOn('2026-07-01'));
+        $carried = $new->rentRates()->whereDate('effective_from', '2026-07-01')->sole();
+        $this->assertSame('Carried from transfer: Aircon added', $carried->reason);
+        $this->assertSame(2, $new->rentRates()->count());
+        // Old rows untouched.
+        foreach ($oldRates as $attributes) {
+            $this->assertSame($attributes, RentRate::find($attributes['id'])->getAttributes());
+        }
+
+        $log = $this->lastLog('agreement.transferred')->properties;
+        $this->assertSame(250000, $log['old']['rent_cents']);
+        $this->assertSame(280000, $log['new']['rent_cents']);
+        $this->assertSame([['effective_from' => '2026-07-01', 'rent_cents' => 300000]], $log['new']['carried_rates']);
+    }
+
+    public function test_a_transferred_agreement_cannot_be_moved_out_or_transferred_again(): void
+    {
+        $a102 = $this->perBedUnit('A102');
+        $a103 = $this->perBedUnit('A103');
+        $agreement = $this->anaInA101();
+        $this->service->transfer($agreement, $a102, $this->bed($a102, 1), today()->addDays(10), null, 'First move');
+        $before = $this->counts();
+
+        $this->assertRejected('agreement', fn () => $this->service->moveOut($agreement, today()->addDays(5), 'Leaving'));
+        $this->assertRejected('agreement', fn () => $this->service->transfer($agreement, $a103, $this->bed($a103, 1), today()->addDays(5), null, 'Again'));
+
+        $this->assertSame($before, $this->counts());
+        $this->assertSame(today()->addDays(9)->toDateString(), $agreement->fresh()->end_date->toDateString());
+
+        $this->get(route('tenants.show', $agreement->billingAccount->payer))
+            ->assertInertia(fn (Assert $page) => $page->where('accounts.0.agreements.0.replaced', true)
+                ->where('accounts.0.agreements.1.replaced', false));
     }
 
     public function test_whole_room_transfer_moves_residents_along(): void

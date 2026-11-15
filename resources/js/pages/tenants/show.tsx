@@ -27,6 +27,7 @@ interface Agreement {
     status: string;
     open: boolean;
     whole: boolean;
+    replaced: boolean;
     current_rent_cents: number | null;
     rates: Rate[];
 }
@@ -191,7 +192,12 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                                                 From {formatDate(a.start_date)}
                                                 {a.end_date && ` to ${formatDate(a.end_date)}`}, due on day {a.due_day} of the month
                                             </p>
-                                            {canManageRentals && a.open && (
+                                            {a.replaced && (
+                                                <p className="text-muted-foreground text-sm">
+                                                    Moved to another room. Changes are made on the new rental.
+                                                </p>
+                                            )}
+                                            {canManageRentals && a.open && !a.replaced && (
                                                 <div className="flex flex-wrap gap-2">
                                                     <Button variant="outline" size="sm" onClick={() => openAction({ kind: 'rent', agreement: a })}>
                                                         <Banknote /> Change rent

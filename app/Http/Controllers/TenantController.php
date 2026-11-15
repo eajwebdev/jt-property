@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\AgreementStatus;
 use App\Enums\DeliveryMethod;
 use App\Enums\RentMode;
 use App\Enums\Role;
@@ -155,6 +154,8 @@ class TenantController extends Controller
                     'status' => $a->end_date !== null && $a->end_date->toDateString() < $today ? 'ended' : $a->status->value,
                     'open' => $a->end_date === null || $a->end_date->toDateString() >= $today,
                     'whole' => $a->bed_id === null,
+                    // Same rule as RentalAgreement::wasTransferred(), on the already-loaded agreements.
+                    'replaced' => $a->end_date !== null && $account->agreements->contains(fn ($o) => $o->id !== $a->id && $o->start_date->toDateString() === $a->end_date->copy()->addDay()->toDateString()),
                     'current_rent_cents' => ($a->rentRates->sortBy('effective_from')->filter(fn ($r) => $r->effective_from->toDateString() <= $today)->last() ?? $a->rentRates->sortBy('effective_from')->first())?->rent_cents,
                     'rates' => $a->rentRates->sortByDesc('effective_from')->values()->map(fn ($r) => [
                         'id' => $r->id,
@@ -214,9 +215,8 @@ class TenantController extends Controller
         $today = today()->toDateString();
 
         $takenBeds = RentalAgreement::query()
-            ->where('status', AgreementStatus::Active)
+            ->currentOrFuture()
             ->whereNotNull('bed_id')
-            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $today))
             ->whereHas('unit', fn ($q) => $q->where('property_id', $tenant->property_id))
             ->pluck('bed_id')
             ->flip();
@@ -282,7 +282,7 @@ class TenantController extends Controller
         Gate::authorize('archive', $tenant);
 
         $hasAgreement = $tenant->billingAccounts()
-            ->whereHas('agreements', fn ($a) => $a->where('status', AgreementStatus::Active))
+            ->whereHas('agreements', fn ($a) => $a->currentOrFuture())
             ->exists();
 
         if ($hasAgreement || $tenant->occupancies()->currentOrFuture()->exists()) {
