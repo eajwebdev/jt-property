@@ -294,6 +294,51 @@ class InvoiceGenerationServiceTest extends TestCase
         $this->assertSame('2026-12-31', $a->fresh()->end_date->toDateString());
     }
 
+    public function test_move_out_on_the_last_day_of_a_billed_period_is_allowed_but_earlier_is_not(): void
+    {
+        $a = $this->agreement(350000);
+        $this->service->generate(2026, 11, $this->owner);
+
+        try {
+            app(TenancyService::class)->moveOut($a, Carbon::parse('2026-11-29'));
+            $this->fail('Moved out before the end of an invoiced period.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('move_out_date', $e->errors());
+        }
+
+        app(TenancyService::class)->moveOut($a, Carbon::parse('2026-11-30'));
+        $this->assertSame('2026-11-30', $a->fresh()->end_date->toDateString());
+    }
+
+    public function test_rent_change_boundaries_backdated_rejected_day_after_period_allowed(): void
+    {
+        $a = $this->agreement(350000);
+        $this->service->generate(2026, 11, $this->owner);
+
+        foreach (['2026-10-15', '2026-11-30'] as $date) {
+            try {
+                app(TenancyService::class)->changeRent($a, 400000, Carbon::parse($date), 'Backdated');
+                $this->fail("Rent changed from {$date}.");
+            } catch (ValidationException $e) {
+                $this->assertArrayHasKey('effective_from', $e->errors());
+            }
+        }
+
+        app(TenancyService::class)->changeRent($a, 400000, Carbon::parse('2026-12-01'), 'Next cycle');
+        $this->assertSame(2, RentRate::where('rental_agreement_id', $a->id)->count());
+    }
+
+    public function test_recurring_charge_end_boundary_period_end_allowed_earlier_rejected(): void
+    {
+        $a = $this->agreement(350000);
+        $charge = $this->recurring($a, 'Rice cooker', 20000);
+        $this->service->generate(2026, 11, $this->owner);
+
+        $this->post(route('recurring-charges.end', $charge), ['end_date' => '2026-11-29'])->assertSessionHasErrors('end_date');
+        $this->post(route('recurring-charges.end', $charge), ['end_date' => '2026-11-30'])->assertSessionHasNoErrors();
+        $this->assertSame('2026-11-30', $charge->fresh()->end_date->toDateString());
+    }
+
     public function test_ending_a_recurring_charge_inside_an_invoiced_period_is_rejected(): void
     {
         $a = $this->agreement(350000);

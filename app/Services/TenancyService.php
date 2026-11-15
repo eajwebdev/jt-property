@@ -131,7 +131,7 @@ class TenancyService
             $from = $effectiveFrom->toDateString();
 
             $error = match (true) {
-                Invoice::finalizedInPeriod($agreement->id, $from, $from) => Invoice::INVOICED_PERIOD_MESSAGE,
+                Invoice::finalizedInPeriod($agreement->id, $from) => Invoice::INVOICED_PERIOD_MESSAGE,
                 $from < $agreement->start_date->toDateString() => 'The new rent cannot start before the rental starts ('.$agreement->start_date->toDateString().').',
                 $agreement->end_date !== null && $from > $agreement->end_date->toDateString() => 'The new rent cannot start after the rental ends ('.$agreement->end_date->toDateString().').',
                 $agreement->rentRates()->whereDate('effective_from', $from)->exists() => 'There is already a rent starting on this date. Pick another date.',
@@ -169,7 +169,8 @@ class TenancyService
             $error = match (true) {
                 $last < $agreement->start_date->toDateString() => 'The move-out date cannot be before the rental starts ('.$agreement->start_date->toDateString().').',
                 $last > today()->addDays(365)->toDateString() => 'The move-out date must be within the next 12 months.',
-                Invoice::finalizedInPeriod($agreement->id, $last) => Invoice::INVOICED_PERIOD_MESSAGE,
+                // The last day of a billed period may be the last day lived in: only earlier dates change that bill.
+                Invoice::finalizedInPeriod($agreement->id, $date->copy()->addDay()->toDateString()) => Invoice::INVOICED_PERIOD_MESSAGE,
                 default => $this->endError($agreement, $last),
             };
             if ($error) {

@@ -76,6 +76,8 @@ class UtilityAllocationService
         $excluded = UtilityExclusion::where('rental_agreement_id', $agreement->id)->whereDate('bill_month', $month->toDateString())->pluck('type');
 
         foreach (self::TYPES as $type => [$name, $measure]) {
+            // An excluded agreement simply gets no line. Its share is NOT redistributed to the other
+            // agreements of the unit (the owner's explicit choice: the owner absorbs it).
             $config = $configs->get($type);
             if ($config === null || $config->mode === 'inclusive' || $excluded->contains($type)) {
                 continue;

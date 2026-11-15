@@ -10,6 +10,7 @@ use App\Support\Audit;
 use App\Support\Money;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -92,7 +93,7 @@ class RecurringChargeController extends Controller
         DB::transaction(function () use ($charge, $data) {
             $charge = RecurringCharge::lockForUpdate()->findOrFail($charge->id);
             $old = $charge->end_date?->toDateString();
-            if (Invoice::finalizedInPeriod($charge->rental_agreement_id, $data['end_date'], $data['end_date'])) {
+            if (Invoice::finalizedInPeriod($charge->rental_agreement_id, Carbon::parse($data['end_date'])->addDay()->toDateString())) {
                 throw ValidationException::withMessages(['end_date' => Invoice::INVOICED_PERIOD_MESSAGE]);
             }
             if ($old !== null && $data['end_date'] > $old) {
