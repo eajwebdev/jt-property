@@ -1,3 +1,4 @@
+import StartRentalDialog, { type RentalOptions } from '@/components/start-rental-dialog';
 import TenantStatusBadge, { NoEmailBadge } from '@/components/tenant-status-badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +8,8 @@ import AppLayout from '@/layouts/app-layout';
 import { agreementStatusLabels, deliveryLabels, depositStatusLabels, formatDate } from '@/lib/tenant-labels';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Pencil } from 'lucide-react';
+import { KeyRound, Pencil } from 'lucide-react';
+import { useState } from 'react';
 
 interface Rate {
     id: number;
@@ -56,18 +58,21 @@ interface Props {
     occupancies: { id: number; room: string; move_in_date: string; move_out_date: string | null; is_payer: boolean }[];
     canEdit: boolean;
     canArchive: boolean;
+    canStartRental: boolean;
+    rentalOptions: RentalOptions | null;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div>
-            <dt className="text-xs text-muted-foreground">{label}</dt>
+            <dt className="text-muted-foreground text-xs">{label}</dt>
             <dd className="text-sm">{children}</dd>
         </div>
     );
 }
 
-export default function Show({ tenant, accounts, occupancies, canEdit, canArchive }: Props) {
+export default function Show({ tenant, accounts, occupancies, canEdit, canArchive, canStartRental, rentalOptions }: Props) {
+    const [rentalOpen, setRentalOpen] = useState(false);
     const { flash } = usePage<SharedData>().props;
     const errors = usePage().props.errors as Record<string, string>;
 
@@ -90,10 +95,15 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1">
                         <h1 className="text-2xl font-semibold tracking-tight">{tenant.full_name}</h1>
-                        <p className="text-sm text-muted-foreground">{tenant.property}</p>
+                        <p className="text-muted-foreground text-sm">{tenant.property}</p>
                         {tenant.archived_at && <TenantStatusBadge status="archived" date={tenant.archived_at} />}
                     </div>
                     <div className="flex flex-wrap gap-2">
+                        {canStartRental && rentalOptions && (
+                            <Button size="lg" onClick={() => setRentalOpen(true)}>
+                                <KeyRound /> Start rental
+                            </Button>
+                        )}
                         {canEdit && (
                             <Button asChild variant="outline" size="lg">
                                 <Link href={route('tenants.edit', tenant.id)}>
@@ -147,7 +157,7 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                         Rentals and rent history
                     </h2>
                     {accounts.length === 0 ? (
-                        <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No rental yet</p>
+                        <p className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">No rental yet</p>
                     ) : (
                         accounts.map((account) => (
                             <Card key={account.id}>
@@ -155,24 +165,30 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                                     <CardTitle className="text-base">Account {account.account_no}</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    {account.agreements.length === 0 && <p className="text-sm text-muted-foreground">No rental yet</p>}
+                                    {account.agreements.length === 0 && <p className="text-muted-foreground text-sm">No rental yet</p>}
                                     {account.agreements.map((a) => (
                                         <div key={a.id} className="space-y-2 rounded-lg border p-3">
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <p className="font-medium">Room {a.room}</p>
                                                 <Badge variant="outline">{agreementStatusLabels[a.status] ?? a.status}</Badge>
                                             </div>
-                                            <p className="text-sm text-muted-foreground">
+                                            <p className="text-muted-foreground text-sm">
                                                 From {formatDate(a.start_date)}
                                                 {a.end_date && ` to ${formatDate(a.end_date)}`}, due on day {a.due_day} of the month
                                             </p>
                                             <table className="w-full text-sm">
                                                 <caption className="sr-only">Rent history for room {a.room}</caption>
-                                                <thead className="text-left text-muted-foreground">
+                                                <thead className="text-muted-foreground text-left">
                                                     <tr>
-                                                        <th scope="col" className="py-1 pr-3 font-medium">Rent</th>
-                                                        <th scope="col" className="py-1 pr-3 font-medium">From</th>
-                                                        <th scope="col" className="py-1 font-medium">Reason</th>
+                                                        <th scope="col" className="py-1 pr-3 font-medium">
+                                                            Rent
+                                                        </th>
+                                                        <th scope="col" className="py-1 pr-3 font-medium">
+                                                            From
+                                                        </th>
+                                                        <th scope="col" className="py-1 font-medium">
+                                                            Reason
+                                                        </th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -190,7 +206,7 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                                     <div>
                                         <h3 className="mb-1 text-sm font-medium">Deposits</h3>
                                         {account.deposits.length === 0 ? (
-                                            <p className="text-sm text-muted-foreground">No deposit recorded</p>
+                                            <p className="text-muted-foreground text-sm">No deposit recorded</p>
                                         ) : (
                                             <ul className="space-y-1 text-sm">
                                                 {account.deposits.map((d) => (
@@ -213,14 +229,14 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                         Rooms lived in
                     </h2>
                     {occupancies.length === 0 ? (
-                        <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No rental yet</p>
+                        <p className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">No rental yet</p>
                     ) : (
                         <ul className="divide-y rounded-lg border">
                             {occupancies.map((o) => (
                                 <li key={o.id} className="flex flex-wrap justify-between gap-2 p-3 text-sm">
                                     <span className="font-medium">
                                         Room {o.room}
-                                        {o.is_payer && <span className="font-normal text-muted-foreground"> (pays the rent)</span>}
+                                        {o.is_payer && <span className="text-muted-foreground font-normal"> (pays the rent)</span>}
                                     </span>
                                     <span className="text-muted-foreground">
                                         {formatDate(o.move_in_date)} to {o.move_out_date ? formatDate(o.move_out_date) : 'now'}
@@ -231,6 +247,16 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                     )}
                 </section>
             </div>
+
+            {canStartRental && rentalOptions && (
+                <StartRentalDialog
+                    tenantId={tenant.id}
+                    tenantName={tenant.full_name}
+                    options={rentalOptions}
+                    open={rentalOpen}
+                    onOpenChange={setRentalOpen}
+                />
+            )}
         </AppLayout>
     );
 }

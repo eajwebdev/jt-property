@@ -4,13 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Enums\AgreementStatus;
 use App\Enums\DeliveryMethod;
+use App\Enums\RentMode;
 use App\Enums\Role;
 use App\Http\Requests\StoreTenantRequest;
 use App\Http\Requests\UpdateTenantRequest;
 use App\Models\Occupancy;
 use App\Models\Property;
+use App\Models\RentalAgreement;
 use App\Models\RentRate;
 use App\Models\Tenant;
+use App\Models\Unit;
 use App\Support\Audit;
 use App\Support\Money;
 use Illuminate\Http\RedirectResponse;
@@ -131,7 +134,7 @@ class TenantController extends Controller
     {
         Gate::authorize('view', $tenant);
 
-        $tenant->load('property:id,name');
+        $tenant->load('property:id,name,archived_at');
 
         $accounts = $tenant->billingAccounts()
             ->with(['agreements.unit:id,code', 'agreements.bed:id,label', 'agreements.rentRates', 'deposits'])
@@ -177,6 +180,7 @@ class TenantController extends Controller
             ]);
 
         $user = request()->user();
+        $canStartRental = $user->can('create', RentalAgreement::class) && $tenant->archived_at === null && $tenant->property->archived_at === null;
 
         return Inertia::render('tenants/show', [
             'tenant' => array_merge(
@@ -187,7 +191,57 @@ class TenantController extends Controller
             'occupancies' => $occupancies,
             'canEdit' => $user->can('update', $tenant),
             'canArchive' => $user->can('archive', $tenant) && $tenant->archived_at === null,
+            'canStartRental' => $canStartRental,
+            'rentalOptions' => $canStartRental ? $this->rentalOptions($tenant) : null,
         ]);
+    }
+
+    /**
+     * Rooms, free beds and possible co-residents for the "Start rental" dialog.
+     * Only a convenience list: TenancyService re-checks every rule when saving.
+     *
+     * @return array<string, mixed>
+     */
+    private function rentalOptions(Tenant $tenant): array
+    {
+        $today = today()->toDateString();
+
+        $takenBeds = RentalAgreement::query()
+            ->where('status', AgreementStatus::Active)
+            ->whereNotNull('bed_id')
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $today))
+            ->whereHas('unit', fn ($q) => $q->where('property_id', $tenant->property_id))
+            ->pluck('bed_id')
+            ->flip();
+
+        $units = Unit::query()
+            ->where('property_id', $tenant->property_id)
+            ->with(['beds' => fn ($q) => $q->orderBy('id')])
+            ->withCount(['occupancies as occupied' => fn ($q) => $q->activeOn($today)])
+            ->orderBy('code')
+            ->get()
+            ->map(fn (Unit $unit) => [
+                'id' => $unit->id,
+                'code' => $unit->code,
+                'rent_mode' => $unit->rent_mode->value,
+                'capacity' => $unit->capacity,
+                'occupied' => $unit->occupied,
+                'status' => $unit->displayStatusFor($unit->occupied),
+                'beds' => $unit->rent_mode === RentMode::PerBed
+                    ? $unit->beds->reject(fn ($bed) => $takenBeds->has($bed->id))->map(fn ($bed) => ['id' => $bed->id, 'label' => $bed->label])->values()
+                    : [],
+            ]);
+
+        $residents = Tenant::query()
+            ->where('property_id', $tenant->property_id)
+            ->whereNull('archived_at')
+            ->whereKeyNot($tenant->id)
+            ->whereDoesntHave('occupancies', fn ($q) => $q->currentOrFuture())
+            ->orderBy('full_name')
+            ->get(['id', 'full_name'])
+            ->map(fn (Tenant $t) => ['id' => $t->id, 'name' => $t->full_name]);
+
+        return ['units' => $units, 'residents' => $residents, 'today' => $today];
     }
 
     public function edit(Request $request, Tenant $tenant): Response

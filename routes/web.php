@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\PropertyController;
+use App\Http\Controllers\RentalAgreementController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\UnitController;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +19,7 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('properties.units', UnitController::class)->shallow()->only(['store', 'update']);
     Route::resource('tenants', TenantController::class)->except('destroy');
     Route::patch('tenants/{tenant}/archive', [TenantController::class, 'archive'])->name('tenants.archive');
+    Route::post('tenants/{tenant}/agreements', [RentalAgreementController::class, 'store'])->name('tenants.agreements.store');
 });
 
 require __DIR__.'/settings.php';
