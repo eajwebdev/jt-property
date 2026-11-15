@@ -163,7 +163,7 @@ class BillingPreviewService
     }
 
     /** @return Collection<int, RentalAgreement> */
-    private function agreements(int $year, int $month, ?int $propertyId, ?array $agreementIds, ?User $for): Collection
+    public function agreements(int $year, int $month, ?int $propertyId, ?array $agreementIds, ?User $for): Collection
     {
         $first = CarbonImmutable::create($year, $month, 1, 0, 0, 0, 'Asia/Manila');
 

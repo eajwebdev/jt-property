@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\InvoiceStatus;
+use App\Models\Invoice;
 use App\Models\OneTimeCharge;
 use App\Rules\Pesos;
 use App\Support\Audit;
@@ -12,6 +14,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class OneTimeChargeController extends Controller
 {
@@ -30,6 +33,12 @@ class OneTimeChargeController extends Controller
             'bill_month' => ['required', 'date_format:Y-m'],
             'reason' => ['nullable', 'string', 'max:1000'],
         ]);
+
+        $month = Carbon::createFromFormat('!Y-m', $data['bill_month']);
+        if (Invoice::where('billing_account_id', $data['billing_account_id'])->where('status', InvoiceStatus::Finalized)
+            ->whereBetween('period_start', [$month->toDateString(), $month->copy()->endOfMonth()->toDateString()])->exists()) {
+            throw ValidationException::withMessages(['bill_month' => Invoice::INVOICED_PERIOD_MESSAGE]);
+        }
 
         $charge = DB::transaction(function () use ($data) {
             $charge = OneTimeCharge::create([

@@ -173,8 +173,7 @@ class UtilityAllocationService
         }
 
         $amount = $this->amountFor($bill);
-        $unit = $bill->unit;
-        $method = $unit->rent_mode === RentMode::Whole ? 'days' : ($this->config($bill)?->split_method ?? 'equal');
+        $method = $this->basis($bill);
 
         if ($method === 'equal') {
             return $this->largestRemainder($amount, $eligible->map(fn () => 1)->all());
@@ -195,6 +194,12 @@ class UtilityAllocationService
         }
 
         return array_sum($weights) > 0 ? $this->largestRemainder($amount, $weights) : null;
+    }
+
+    /** How this bill is split: equal | days | percent | manual (whole-unit rentals always split by days). */
+    public function basis(UtilityBill $bill): string
+    {
+        return $bill->unit->rent_mode === RentMode::Whole ? 'days' : ($this->config($bill)?->split_method ?? 'equal');
     }
 
     private function config(UtilityBill $bill): ?UnitUtility

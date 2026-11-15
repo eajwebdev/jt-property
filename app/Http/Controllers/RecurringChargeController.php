@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Invoice;
 use App\Models\RecurringCharge;
 use App\Models\RentalAgreement;
 use App\Rules\Pesos;
@@ -91,6 +92,9 @@ class RecurringChargeController extends Controller
         DB::transaction(function () use ($charge, $data) {
             $charge = RecurringCharge::lockForUpdate()->findOrFail($charge->id);
             $old = $charge->end_date?->toDateString();
+            if (Invoice::finalizedInPeriod($charge->rental_agreement_id, $data['end_date'], $data['end_date'])) {
+                throw ValidationException::withMessages(['end_date' => Invoice::INVOICED_PERIOD_MESSAGE]);
+            }
             if ($old !== null && $data['end_date'] > $old) {
                 throw ValidationException::withMessages(['end_date' => "This charge already ends on {$old}. Pick that date or earlier."]);
             }

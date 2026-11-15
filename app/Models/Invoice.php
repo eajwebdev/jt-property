@@ -48,6 +48,18 @@ class Invoice extends Model
         static::deleting(fn () => throw new LogicException('Invoices cannot be deleted; void them instead.'));
     }
 
+    public const INVOICED_PERIOD_MESSAGE = 'A bill was already issued for this period — void it first or pick a later date.';
+
+    /** True when the agreement has a finalized invoice whose period touches [$from, $to] (dates, inclusive). */
+    public static function finalizedInPeriod(int $agreementId, string $from, string $to = '9999-12-31'): bool
+    {
+        return static::where('rental_agreement_id', $agreementId)
+            ->where('status', InvoiceStatus::Finalized)
+            ->whereDate('period_start', '<=', $to)
+            ->whereDate('period_end', '>=', $from)
+            ->exists();
+    }
+
     public function billingAccount(): BelongsTo
     {
         return $this->belongsTo(BillingAccount::class);

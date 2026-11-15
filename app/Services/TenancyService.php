@@ -9,6 +9,7 @@ use App\Enums\RentMode;
 use App\Enums\UnitStatus;
 use App\Models\Bed;
 use App\Models\BillingAccount;
+use App\Models\Invoice;
 use App\Models\Occupancy;
 use App\Models\RentalAgreement;
 use App\Models\RentRate;
@@ -130,6 +131,7 @@ class TenancyService
             $from = $effectiveFrom->toDateString();
 
             $error = match (true) {
+                Invoice::finalizedInPeriod($agreement->id, $from, $from) => Invoice::INVOICED_PERIOD_MESSAGE,
                 $from < $agreement->start_date->toDateString() => 'The new rent cannot start before the rental starts ('.$agreement->start_date->toDateString().').',
                 $agreement->end_date !== null && $from > $agreement->end_date->toDateString() => 'The new rent cannot start after the rental ends ('.$agreement->end_date->toDateString().').',
                 $agreement->rentRates()->whereDate('effective_from', $from)->exists() => 'There is already a rent starting on this date. Pick another date.',
@@ -167,6 +169,7 @@ class TenancyService
             $error = match (true) {
                 $last < $agreement->start_date->toDateString() => 'The move-out date cannot be before the rental starts ('.$agreement->start_date->toDateString().').',
                 $last > today()->addDays(365)->toDateString() => 'The move-out date must be within the next 12 months.',
+                Invoice::finalizedInPeriod($agreement->id, $last) => Invoice::INVOICED_PERIOD_MESSAGE,
                 default => $this->endError($agreement, $last),
             };
             if ($error) {
@@ -254,6 +257,7 @@ class TenancyService
             $error = match (true) {
                 $last < $agreement->start_date->toDateString() => 'The move date must be after the first day of the current rental ('.$agreement->start_date->toDateString().').',
                 (int) $toUnit->id === (int) $agreement->unit_id && $toBed?->id == $agreement->bed_id => 'Choose a different room or bed.',
+                Invoice::finalizedInPeriod($agreement->id, $start) => Invoice::INVOICED_PERIOD_MESSAGE,
                 default => $this->endError($agreement, $last),
             };
             if ($error) {
