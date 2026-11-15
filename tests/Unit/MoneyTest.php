@@ -95,4 +95,23 @@ class MoneyTest extends TestCase
 
         Money::toCents('');
     }
+
+    public function test_round_half_up_div_rounds_exact_halves_up(): void
+    {
+        $this->assertSame(2, Money::roundHalfUpDiv(3, 2));   // 1.5
+        $this->assertSame(1, Money::roundHalfUpDiv(1, 2));   // 0.5
+        $this->assertSame(0, Money::roundHalfUpDiv(1, 3));   // 0.33
+        $this->assertSame(1, Money::roundHalfUpDiv(2, 3));   // 0.67
+        $this->assertSame(5, Money::roundHalfUpDiv(10, 2));  // exact
+        $this->assertSame(0, Money::roundHalfUpDiv(0, 7));
+        $this->assertSame(1500000, Money::roundHalfUpDiv(1500000 * 30, 30));
+        $this->assertSame(500000, Money::roundHalfUpDiv(1500000 * 15, 45)); // 500000.0
+    }
+
+    public function test_round_half_up_div_rejects_non_positive_denominator(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        Money::roundHalfUpDiv(1, 0);
+    }
 }
