@@ -38,6 +38,10 @@ class TenancyService
             $residentIds = array_values(array_unique(array_map('intval', $options['resident_tenant_ids'] ?? [])));
             $override = trim((string) ($options['override_reason'] ?? '')) ?: null;
 
+            // Lock the people too (fixed id order): stops the same tenant being placed in two rooms at once
+            // and two active billing accounts being created for one payer.
+            $payer = Tenant::whereIn('id', [$payer->id, ...$residentIds])->orderBy('id')->lockForUpdate()->get()->find($payer->id) ?? $payer;
+
             $errors = $this->ruleErrors($payer, $unit, $bed, $start, $end, $residentIds, $override);
             if ($errors) {
                 throw ValidationException::withMessages($errors);
@@ -115,6 +119,13 @@ class TenancyService
             $errors['tenant'] = 'This tenant is archived. Archived tenants cannot start a new rental.';
         } elseif ((int) $payer->property_id !== (int) $unit->property_id) {
             $errors['tenant'] = 'This tenant belongs to a different property than the room.';
+        } elseif ($this->overlapping(Occupancy::query(), $start, $end)->where('tenant_id', $payer->id)->exists()) {
+            // Never bypassed by override_reason: a person cannot live in two places at once.
+            $errors['tenant'] = 'This tenant already has a room for some of these dates.';
+        }
+
+        if ($end !== null && $end < $start) {
+            $errors['end_date'] = 'The end date cannot be before the start date.';
         }
 
         if ($unit->status !== UnitStatus::Available) {
@@ -139,7 +150,7 @@ class TenancyService
         }
 
         if ($unit->property->archived_at !== null) {
-            $errors['unit'] = 'This property is archived. Rentals cannot start in an archived property.';
+            $errors['property'] = 'This property is archived. Rentals cannot start in an archived property.';
         } elseif ($override === null && ! isset($errors['bed']) && $this->hasOverlappingAgreement($unit, $bed, $start, $end)) {
             $errors['unit'] = $bed
                 ? 'This bed (or the whole room) is already rented for some of these dates.'

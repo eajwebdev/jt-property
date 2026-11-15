@@ -301,7 +301,8 @@ class TenancyServiceTest extends TestCase
         $this->assertRejected('tenant', fn () => $this->service->startAgreement($outsider, $unit, null, 250000, 5, $this->date('2026-12-01')));
 
         $this->property->update(['archived_at' => now()]);
-        $this->assertRejected('unit', fn () => $this->service->startAgreement($this->tenant(), $unit->fresh(), null, 250000, 5, $this->date('2026-12-01')));
+        $keys = $this->assertRejected('property', fn () => $this->service->startAgreement($this->tenant(), $unit->fresh(), null, 250000, 5, $this->date('2026-12-01')));
+        $this->assertNotContains('unit', $keys);
         $this->assertSame(0, RentalAgreement::count());
     }
 
@@ -328,6 +329,48 @@ class TenancyServiceTest extends TestCase
         Occupancy::factory()->for($moved)->create(['move_in_date' => '2026-01-01', 'move_out_date' => '2026-11-30']);
         $this->service->startAgreement($payer, $unit, null, 500000, 5, $start, ['resident_tenant_ids' => [$moved->id]]);
         $this->assertSame(2, Occupancy::where('unit_id', $unit->id)->count());
+    }
+
+    public function test_payer_with_open_ended_room_cannot_start_another_even_with_override(): void
+    {
+        $a101 = $this->perBedUnit('A101', 2);
+        $a102 = $this->perBedUnit('A102', 2);
+        $payer = $this->tenant('Demo Ana');
+        $this->service->startAgreement($payer, $a101, $this->bed($a101, 1), 250000, 5, $this->date('2026-01-01'));
+        $before = $this->counts();
+
+        $this->assertRejected('tenant', fn () => $this->service->startAgreement($payer, $a102, $this->bed($a102, 1), 250000, 5, $this->date('2026-12-01')));
+        $this->assertRejected('tenant', fn () => $this->service->startAgreement($payer, $a101, $this->bed($a101, 2), 250000, 5, $this->date('2026-12-01')));
+        $this->assertRejected('tenant', fn () => $this->service->startAgreement($payer, $a102, $this->bed($a102, 1), 250000, 5, $this->date('2026-12-01'), [
+            'override_reason' => 'Owner wants to allow two rooms',
+        ]));
+
+        $this->assertSame($before, $this->counts());
+    }
+
+    public function test_payer_can_start_a_new_room_the_day_after_their_stay_ends(): void
+    {
+        $a101 = $this->perBedUnit('A101', 1);
+        $a102 = $this->perBedUnit('A102', 1);
+        $payer = $this->tenant('Demo Ben');
+        $this->service->startAgreement($payer, $a101, $this->bed($a101, 1), 250000, 5, $this->date('2026-01-01'), ['end_date' => '2026-04-15']);
+
+        $this->assertRejected('tenant', fn () => $this->service->startAgreement($payer, $a102, $this->bed($a102, 1), 250000, 5, $this->date('2026-04-15')));
+        $this->service->startAgreement($payer, $a102, $this->bed($a102, 1), 250000, 5, $this->date('2026-04-16'));
+
+        $this->assertSame(2, RentalAgreement::count());
+        $this->assertSame(1, BillingAccount::count()); // same active account reused
+    }
+
+    public function test_end_date_before_start_date_is_rejected_by_the_service(): void
+    {
+        $unit = $this->wholeUnit();
+
+        $this->assertRejected('end_date', fn () => $this->service->startAgreement($this->tenant(), $unit, null, 250000, 5, $this->date('2026-12-01'), ['end_date' => '2026-11-30']));
+        $this->assertSame(0, RentalAgreement::count());
+
+        $this->service->startAgreement($this->tenant(), $unit, null, 250000, 5, $this->date('2026-12-01'), ['end_date' => '2026-12-01']);
+        $this->assertSame(1, RentalAgreement::count());
     }
 
     public function test_residents_count_towards_capacity(): void

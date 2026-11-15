@@ -42,7 +42,7 @@ const statusText: Record<string, string> = {
 };
 
 // Errors from the server-side rules that do not belong to a single input.
-const ruleKeys = ['tenant', 'unit', 'capacity', 'unit_status'] as const;
+const ruleKeys = ['tenant', 'property', 'unit', 'capacity', 'unit_status'] as const;
 
 export default function StartRentalDialog({ tenantId, tenantName, options, open, onOpenChange }: Props) {
     const blank = {
