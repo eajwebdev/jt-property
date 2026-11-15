@@ -10,6 +10,9 @@ use App\Http\Controllers\RentalAgreementController;
 use App\Http\Controllers\SecurityDepositController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\UnitController;
+use App\Http\Controllers\UtilityBillController;
+use App\Http\Controllers\UtilityController;
+use App\Http\Controllers\UtilityExclusionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -36,6 +39,12 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('recurring-charges/{charge}', [RecurringChargeController::class, 'update'])->name('recurring-charges.update');
     Route::post('recurring-charges/{charge}/end', [RecurringChargeController::class, 'end'])->name('recurring-charges.end');
     Route::post('one-time-charges', [OneTimeChargeController::class, 'store'])->name('one-time-charges.store');
+    Route::get('utilities', [UtilityController::class, 'index'])->name('utilities.index');
+    Route::put('units/{unit}/utilities/{type}', [UtilityController::class, 'configure'])->whereIn('type', ['electricity', 'water'])->name('utilities.configure');
+    Route::post('utility-bills', [UtilityBillController::class, 'store'])->name('utility-bills.store');
+    Route::get('utility-bills/{bill}/evidence', [UtilityBillController::class, 'evidence'])->name('utility-bills.evidence');
+    Route::post('agreements/{agreement}/utility-exclusions', [UtilityExclusionController::class, 'store'])->name('agreements.utility-exclusions.store');
+    Route::delete('utility-exclusions/{exclusion}', [UtilityExclusionController::class, 'destroy'])->name('utility-exclusions.destroy');
     Route::post('charge-categories', [ChargeCategoryController::class, 'store'])->name('charge-categories.store');
     Route::patch('charge-categories/{category}', [ChargeCategoryController::class, 'update'])->name('charge-categories.update');
 });

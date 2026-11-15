@@ -10,7 +10,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatCents, parsePesos } from '@/lib/money';
 import { formatDate } from '@/lib/tenant-labels';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { FormEventHandler, useEffect, useState } from 'react';
 
@@ -493,6 +493,9 @@ export default function Charges({ recurring, oneTime, categories, canManage, opt
                 <div className="space-y-1">
                     <h1 className="text-2xl font-semibold tracking-tight">Charges &amp; Utilities</h1>
                     <p className="text-muted-foreground text-sm">Extra fees on top of rent, like a rice cooker, a repair, or a credit.</p>
+                    <Button asChild variant="outline" size="sm">
+                        <Link href={route('utilities.index')}>Water &amp; electricity readings</Link>
+                    </Button>
                 </div>
 
                 {flash.success && (
