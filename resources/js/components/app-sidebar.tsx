@@ -3,7 +3,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { Building2, LayoutGrid, Users } from 'lucide-react';
+import { Building2, FileText, History, LayoutGrid, Receipt, Users, Wallet } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -21,6 +21,26 @@ const mainNavItems: NavItem[] = [
         title: 'Tenants',
         url: '/tenants',
         icon: Users,
+    },
+    {
+        title: 'Charges & Utilities',
+        url: '/charges',
+        icon: Receipt,
+    },
+    {
+        title: 'Billing',
+        url: '/billing',
+        icon: FileText,
+    },
+    {
+        title: 'Collections',
+        url: '/collections',
+        icon: Wallet,
+    },
+    {
+        title: 'Opening Balances',
+        url: '/opening-balances',
+        icon: History,
     },
 ];
 

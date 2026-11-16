@@ -51,4 +51,17 @@ final class Money
 
         return $m[1] === '-' ? -$cents : $cents;
     }
+
+    /**
+     * Integer-only $numerator / $denominator rounded half-up (0.5 goes up). No floats.
+     * For non-negative numerators and a positive denominator, which is all billing needs.
+     */
+    public static function roundHalfUpDiv(int $numerator, int $denominator): int
+    {
+        if ($denominator <= 0 || $numerator < 0) {
+            throw new InvalidArgumentException('roundHalfUpDiv needs a positive denominator and a non-negative numerator.');
+        }
+
+        return intdiv(2 * $numerator + $denominator, 2 * $denominator);
+    }
 }

@@ -7,6 +7,7 @@ use App\Enums\RentMode;
 use App\Enums\Role;
 use App\Http\Requests\StoreTenantRequest;
 use App\Http\Requests\UpdateTenantRequest;
+use App\Models\ChargeCategory;
 use App\Models\Occupancy;
 use App\Models\Property;
 use App\Models\RentalAgreement;
@@ -131,7 +132,7 @@ class TenantController extends Controller
         $today = today()->toDateString();
 
         $accounts = $tenant->billingAccounts()
-            ->with(['agreements.unit:id,code', 'agreements.bed:id,label', 'agreements.rentRates', 'agreements.replacedBy:id,replaces_agreement_id', 'deposits'])
+            ->with(['agreements.unit:id,code', 'agreements.bed:id,label', 'agreements.rentRates', 'agreements.recurringCharges', 'agreements.replacedBy:id,replaces_agreement_id', 'deposits'])
             ->orderBy('id')
             ->get();
         $rents = RentalAgreement::currentRents($accounts->pluck('agreements')->flatten(), $today);
@@ -151,6 +152,15 @@ class TenantController extends Controller
                 'whole' => $a->bed_id === null,
                 'replaced' => $a->isReplaced(),
                 'current_rent_cents' => $rents[$a->id] ?? null,
+                // Shown as 'Starts <date>: amount' while a rental has not begun and has no current rent yet.
+                'first_rent_cents' => $a->rentRates->sortBy('effective_from')->first()?->rent_cents,
+                'recurring_charges' => $a->recurringCharges->sortBy('start_date')->values()->map(fn ($c) => [
+                    'id' => $c->id,
+                    'label' => $c->label,
+                    'amount' => Money::format($c->amount_cents),
+                    'start_date' => $c->start_date->toDateString(),
+                    'end_date' => $c->end_date?->toDateString(),
+                ]),
                 'rates' => $a->rentRates->sortByDesc('effective_from')->values()->map(fn ($r) => [
                     'id' => $r->id,
                     'rent' => Money::format($r->rent_cents),
@@ -168,7 +178,7 @@ class TenantController extends Controller
         ]);
 
         $occupancies = $tenant->occupancies()
-            ->with(['unit:id,code', 'bed:id,label'])
+            ->with(['unit:id,code', 'bed:id,label', 'rentalAgreement.replacedBy:id,replaces_agreement_id'])
             ->orderByDesc('move_in_date')
             ->get()
             ->map(fn (Occupancy $o) => [
@@ -177,6 +187,7 @@ class TenantController extends Controller
                 'move_in_date' => $o->move_in_date->toDateString(),
                 'move_out_date' => $o->move_out_date?->toDateString(),
                 'is_payer' => $o->is_payer,
+                'replaced' => $o->rentalAgreement->isReplaced(),
                 'open' => $o->move_out_date === null || $o->move_out_date->toDateString() >= $today,
             ]);
 
@@ -195,6 +206,7 @@ class TenantController extends Controller
             'canStartRental' => $canStartRental,
             'rentalOptions' => $canStartRental ? $this->rentalOptions($tenant) : null,
             'canManageRentals' => $user->can('recordDeposit', RentalAgreement::class),
+            'chargeCategories' => $user->can('owner') ? ChargeCategory::orderBy('name')->get(['id', 'name', 'kind', 'is_system']) : [],
             'today' => $today,
         ]);
     }

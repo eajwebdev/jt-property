@@ -1,4 +1,5 @@
 import { ChangeRentDialog, MoveOutDialog, MoveOutResidentDialog, RecordDepositDialog, TransferDialog } from '@/components/agreement-action-dialogs';
+import { AddRecurringChargeDialog, type Category } from '@/components/recurring-charge-dialog';
 import StartRentalDialog, { type RentalOptions } from '@/components/start-rental-dialog';
 import TenantStatusBadge, { NoEmailBadge } from '@/components/tenant-status-badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -6,10 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import { formatCents } from '@/lib/money';
 import { agreementStatusLabels, deliveryLabels, depositStatusLabels, formatDate } from '@/lib/tenant-labels';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowRightLeft, Banknote, DoorOpen, KeyRound, Pencil, PiggyBank } from 'lucide-react';
+import { ArrowRightLeft, Banknote, DoorOpen, KeyRound, Pencil, PiggyBank, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 interface Rate {
@@ -29,7 +31,9 @@ interface Agreement {
     whole: boolean;
     replaced: boolean;
     current_rent_cents: number | null;
+    first_rent_cents: number | null;
     rates: Rate[];
+    recurring_charges: { id: number; label: string; amount: string; start_date: string; end_date: string | null }[];
 }
 interface Deposit {
     id: number;
@@ -60,16 +64,17 @@ interface Props {
         archived_at: string | null;
     };
     accounts: Account[];
-    occupancies: { id: number; room: string; move_in_date: string; move_out_date: string | null; is_payer: boolean; open: boolean }[];
+    occupancies: { id: number; room: string; move_in_date: string; move_out_date: string | null; is_payer: boolean; replaced: boolean; open: boolean }[];
     canEdit: boolean;
     canArchive: boolean;
     canStartRental: boolean;
     rentalOptions: RentalOptions | null;
     canManageRentals: boolean;
+    chargeCategories: Category[];
     today: string;
 }
 
-type Action = { kind: 'rent' | 'move' | 'transfer'; agreement: Agreement } | { kind: 'deposit'; account: Account };
+type Action = { kind: 'rent' | 'move' | 'transfer' | 'charge'; agreement: Agreement } | { kind: 'deposit'; account: Account };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
@@ -80,7 +85,18 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     );
 }
 
-export default function Show({ tenant, accounts, occupancies, canEdit, canArchive, canStartRental, rentalOptions, canManageRentals, today }: Props) {
+export default function Show({
+    tenant,
+    accounts,
+    occupancies,
+    canEdit,
+    canArchive,
+    canStartRental,
+    rentalOptions,
+    canManageRentals,
+    chargeCategories,
+    today,
+}: Props) {
     const [rentalOpen, setRentalOpen] = useState(false);
     // The last chosen action stays mounted while the dialog closes so its exit animation can play.
     const [action, setAction] = useState<Action | null>(null);
@@ -194,6 +210,11 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                                                 From {formatDate(a.start_date)}
                                                 {a.end_date && ` to ${formatDate(a.end_date)}`}, due on day {a.due_day} of the month
                                             </p>
+                                            {a.current_rent_cents === null && a.first_rent_cents != null && (
+                                                <p className="text-sm">
+                                                    Starts {formatDate(a.start_date)}: <span className="font-medium">{formatCents(a.first_rent_cents)}</span> a month
+                                                </p>
+                                            )}
                                             {a.replaced && (
                                                 <p className="text-muted-foreground text-sm">
                                                     Moved to another room. Changes are made on the new rental.
@@ -213,9 +234,25 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                                                             <ArrowRightLeft /> Transfer
                                                         </Button>
                                                     )}
+                                                    <Button variant="outline" size="sm" onClick={() => openAction({ kind: 'charge', agreement: a })}>
+                                                        <Plus /> Add recurring charge
+                                                    </Button>
                                                     <Button variant="outline" size="sm" onClick={() => openAction({ kind: 'move', agreement: a })}>
                                                         <DoorOpen /> Move out
                                                     </Button>
+                                                </div>
+                                            )}
+                                            {a.recurring_charges.length > 0 && (
+                                                <div>
+                                                    <h3 className="text-sm font-medium">Monthly add-ons</h3>
+                                                    <ul className="text-sm">
+                                                        {a.recurring_charges.map((c) => (
+                                                            <li key={c.id}>
+                                                                {c.label} - {c.amount} a month, from {formatDate(c.start_date)}
+                                                                {c.end_date && ` to ${formatDate(c.end_date)}`}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
                                                 </div>
                                             )}
                                             <table className="w-full text-sm">
@@ -290,7 +327,7 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
                                     <span className="text-muted-foreground">
                                         {formatDate(o.move_in_date)} to {o.move_out_date ? formatDate(o.move_out_date) : 'now'}
                                     </span>
-                                    {canManageRentals && o.open && !o.is_payer && (
+                                    {canManageRentals && o.open && !o.is_payer && !o.replaced && (
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -335,6 +372,16 @@ export default function Show({ tenant, accounts, occupancies, canEdit, canArchiv
             )}
             {canManageRentals && action?.kind === 'transfer' && rentalOptions && (
                 <TransferDialog agreement={action.agreement} options={rentalOptions} open={actionOpen} onOpenChange={setActionOpen} today={today} />
+            )}
+            {canManageRentals && action?.kind === 'charge' && (
+                <AddRecurringChargeDialog
+                    agreementId={action.agreement.id}
+                    room={action.agreement.room}
+                    categories={chargeCategories}
+                    today={today}
+                    open={actionOpen}
+                    onOpenChange={setActionOpen}
+                />
             )}
             {canManageRentals && action?.kind === 'deposit' && (
                 <RecordDepositDialog

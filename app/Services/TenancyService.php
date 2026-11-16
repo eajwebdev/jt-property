@@ -9,6 +9,7 @@ use App\Enums\RentMode;
 use App\Enums\UnitStatus;
 use App\Models\Bed;
 use App\Models\BillingAccount;
+use App\Models\Invoice;
 use App\Models\Occupancy;
 use App\Models\RentalAgreement;
 use App\Models\RentRate;
@@ -130,6 +131,7 @@ class TenancyService
             $from = $effectiveFrom->toDateString();
 
             $error = match (true) {
+                Invoice::finalizedInPeriod($agreement->id, $from) => Invoice::INVOICED_PERIOD_MESSAGE,
                 $from < $agreement->start_date->toDateString() => 'The new rent cannot start before the rental starts ('.$agreement->start_date->toDateString().').',
                 $agreement->end_date !== null && $from > $agreement->end_date->toDateString() => 'The new rent cannot start after the rental ends ('.$agreement->end_date->toDateString().').',
                 $agreement->rentRates()->whereDate('effective_from', $from)->exists() => 'There is already a rent starting on this date. Pick another date.',
@@ -167,6 +169,8 @@ class TenancyService
             $error = match (true) {
                 $last < $agreement->start_date->toDateString() => 'The move-out date cannot be before the rental starts ('.$agreement->start_date->toDateString().').',
                 $last > today()->addDays(365)->toDateString() => 'The move-out date must be within the next 12 months.',
+                // The last day of a billed period may be the last day lived in: only earlier dates change that bill.
+                Invoice::finalizedInPeriod($agreement->id, $date->copy()->addDay()->toDateString()) => Invoice::INVOICED_PERIOD_MESSAGE,
                 default => $this->endError($agreement, $last),
             };
             if ($error) {
@@ -208,6 +212,8 @@ class TenancyService
             Tenant::lockForUpdate()->findOrFail($occupancy->tenant_id);
             $occupancy = Occupancy::with('rentalAgreement')->lockForUpdate()->findOrFail($occupancy->id);
             $agreement = $occupancy->rentalAgreement;
+            // The agreement row is not locked on purpose: a resident leaving never changes rent, dates or billing,
+            // and the unit lock above already serialises every flow that does.
             $this->guardNotTransferred($agreement);
             $last = $date->toDateString();
             $current = $occupancy->move_out_date?->toDateString();
@@ -254,6 +260,7 @@ class TenancyService
             $error = match (true) {
                 $last < $agreement->start_date->toDateString() => 'The move date must be after the first day of the current rental ('.$agreement->start_date->toDateString().').',
                 (int) $toUnit->id === (int) $agreement->unit_id && $toBed?->id == $agreement->bed_id => 'Choose a different room or bed.',
+                Invoice::finalizedInPeriod($agreement->id, $start) => Invoice::INVOICED_PERIOD_MESSAGE,
                 default => $this->endError($agreement, $last),
             };
             if ($error) {
@@ -289,9 +296,15 @@ class TenancyService
                 ]);
             }
 
+            ['moved' => $movedCharges, 'copied' => $copiedCharges] = $this->carryRecurringCharges($agreement, $new, $start, $last);
+
             Audit::log('agreement.transferred', $agreement, [
                 'old' => ['rental_agreement_id' => $agreement->id, 'unit_id' => $agreement->unit_id, 'bed_id' => $agreement->bed_id, 'end_date' => $last, 'rent_cents' => $oldRentCents],
                 'new' => [
+                    'moved_recurring_charge_ids' => $movedCharges,
+                    'copied_recurring_charge_ids' => $copiedCharges,
+                    'recurring_charges_agreement_id' => $new->id,
+                    'recurring_charges_from_agreement_id' => $agreement->id,
                     'rental_agreement_id' => $new->id, 'unit_id' => $new->unit_id, 'bed_id' => $new->bed_id, 'start_date' => $start, 'rent_cents' => $rentCents,
                     'carried_rates' => $laterRates->map(fn ($r) => ['effective_from' => $r->effective_from->toDateString(), 'rent_cents' => $r->rent_cents])->values()->all(),
                 ],
@@ -300,6 +313,45 @@ class TenancyService
 
             return $new;
         });
+    }
+
+    /**
+     * Move the old agreement's active add-ons to the new one: the old charge ends the day before $start and a
+     * copy starts on $start (same category, label, amount and end). A charge that has not started yet simply
+     * moves. Charges that already ended before $start or are switched off stay put.
+     * Returns the ids of moved charges (same row, new agreement) and of copies (new rows).
+     *
+     * @return array{moved: int[], copied: int[]}
+     */
+    private function carryRecurringCharges(RentalAgreement $old, RentalAgreement $new, string $start, string $last): array
+    {
+        $moved = $copied = [];
+        $charges = $old->recurringCharges()->where('active', true)
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $start))
+            ->orderBy('id')->lockForUpdate()->get();
+
+        foreach ($charges as $charge) {
+            if ($charge->start_date->toDateString() >= $start) {
+                // Safe to move: ending it at $last would break the end >= start CHECK, and a charge that starts
+                // on/after the transfer date cannot be on any invoice yet (billing is blocked before that date).
+                $charge->update(['rental_agreement_id' => $new->id]);
+                $moved[] = $charge->id;
+
+                continue;
+            }
+
+            $copy = $new->recurringCharges()->create([
+                'charge_category_id' => $charge->charge_category_id,
+                'label' => $charge->label,
+                'amount_cents' => $charge->amount_cents,
+                'start_date' => $start,
+                'end_date' => $charge->end_date?->toDateString(),
+            ]);
+            $charge->update(['end_date' => $last]);
+            $copied[] = $copy->id;
+        }
+
+        return ['moved' => $moved, 'copied' => $copied];
     }
 
     /** A security deposit is a liability record only: it never changes rent or any balance here. */

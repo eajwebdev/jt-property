@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Settings\AppearanceController;
+use App\Http\Controllers\Settings\BillingSettingsController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\UserController;
@@ -20,6 +21,9 @@ Route::middleware('auth')->group(function () {
         return Inertia::render('settings/appearance');
     })->name('appearance');
     Route::patch('settings/appearance', [AppearanceController::class, 'update'])->name('appearance.update');
+
+    Route::get('settings/billing', [BillingSettingsController::class, 'edit'])->name('billing-settings.edit');
+    Route::put('settings/billing', [BillingSettingsController::class, 'update'])->name('billing-settings.update');
 
     Route::middleware('role:owner')->group(function () {
         Route::get('settings/users', [UserController::class, 'index'])->name('users.index');
