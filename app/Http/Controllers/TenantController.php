@@ -61,7 +61,7 @@ class TenantController extends Controller
         $occupancies = Occupancy::query()
             ->activeOn($today)
             ->whereIn('tenant_id', $tenants->pluck('id'))
-            ->with(['unit:id,code', 'bed:id,label', 'rentalAgreement:id,due_day,billing_account_id', 'rentalAgreement.billingAccount:id,payer_tenant_id', 'rentalAgreement.billingAccount.payer:id,full_name'])
+            ->with(['unit:id,code,building', 'bed:id,label', 'rentalAgreement:id,due_day,billing_account_id', 'rentalAgreement.billingAccount:id,payer_tenant_id', 'rentalAgreement.billingAccount.payer:id,full_name'])
             ->orderBy('id')
             ->get()
             ->groupBy('tenant_id');
@@ -85,7 +85,7 @@ class TenantController extends Controller
                 'email' => $tenant->email,
                 'mobile' => $tenant->mobile,
                 'property' => $tenant->property->name,
-                'room' => $current ? $current->unit->code.($current->bed ? ' / '.$current->bed->label : '') : null,
+                'room' => $current ? $current->unit->label.($current->bed ? ' / '.$current->bed->label : '') : null,
                 'rent' => $rent === null ? null : Money::format($rent),
                 'due_day' => $current?->is_payer ? $current->rentalAgreement?->due_day : null,
                 // Residents do not pay: show who does instead of rent and due day.
@@ -100,14 +100,16 @@ class TenantController extends Controller
             'filters' => ['q' => $q, 'status' => $status, 'property' => $propertyId],
             'properties' => $this->accessibleProperties($request)->get(['properties.id', 'properties.name']),
             'canCreate' => $user->can('create', Tenant::class),
+            'form' => $user->can('create', Tenant::class) ? $this->formProps($request, null) : null,
         ]);
     }
 
-    public function create(Request $request): Response
+    /** The form is a modal on the tenant list; this URL just opens it. */
+    public function create(Request $request): RedirectResponse
     {
         Gate::authorize('create', Tenant::class);
 
-        return Inertia::render('tenants/form', $this->formProps($request, null));
+        return redirect()->route('tenants.index', ['create' => 1]);
     }
 
     public function store(StoreTenantRequest $request): RedirectResponse
@@ -132,7 +134,7 @@ class TenantController extends Controller
         $today = today()->toDateString();
 
         $accounts = $tenant->billingAccounts()
-            ->with(['agreements.unit:id,code', 'agreements.bed:id,label', 'agreements.rentRates', 'agreements.recurringCharges', 'agreements.replacedBy:id,replaces_agreement_id', 'deposits'])
+            ->with(['agreements.unit:id,code,building', 'agreements.bed:id,label', 'agreements.rentRates', 'agreements.recurringCharges', 'agreements.replacedBy:id,replaces_agreement_id', 'deposits'])
             ->orderBy('id')
             ->get();
         $rents = RentalAgreement::currentRents($accounts->pluck('agreements')->flatten(), $today);
@@ -142,7 +144,7 @@ class TenantController extends Controller
             'status' => $account->status->value,
             'agreements' => $account->agreements->map(fn ($a) => [
                 'id' => $a->id,
-                'room' => $a->unit->code.($a->bed ? ' / '.$a->bed->label : ''),
+                'room' => $a->unit->label.($a->bed ? ' / '.$a->bed->label : ''),
                 'due_day' => $a->due_day,
                 'start_date' => $a->start_date->toDateString(),
                 'end_date' => $a->end_date?->toDateString(),
@@ -178,12 +180,12 @@ class TenantController extends Controller
         ]);
 
         $occupancies = $tenant->occupancies()
-            ->with(['unit:id,code', 'bed:id,label', 'rentalAgreement.replacedBy:id,replaces_agreement_id'])
+            ->with(['unit:id,code,building', 'bed:id,label', 'rentalAgreement.replacedBy:id,replaces_agreement_id'])
             ->orderByDesc('move_in_date')
             ->get()
             ->map(fn (Occupancy $o) => [
                 'id' => $o->id,
-                'room' => $o->unit->code.($o->bed ? ' / '.$o->bed->label : ''),
+                'room' => $o->unit->label.($o->bed ? ' / '.$o->bed->label : ''),
                 'move_in_date' => $o->move_in_date->toDateString(),
                 'move_out_date' => $o->move_out_date?->toDateString(),
                 'is_payer' => $o->is_payer,
@@ -202,6 +204,7 @@ class TenantController extends Controller
             'accounts' => $accounts,
             'occupancies' => $occupancies,
             'canEdit' => $user->can('update', $tenant),
+            'form' => $user->can('update', $tenant) ? $this->formProps(request(), $tenant) : null,
             'canArchive' => $user->can('archive', $tenant) && $tenant->archived_at === null,
             'canStartRental' => $canStartRental,
             'rentalOptions' => $canStartRental ? $this->rentalOptions($tenant) : null,
@@ -258,11 +261,12 @@ class TenantController extends Controller
         return ['units' => $units, 'residents' => $residents, 'today' => $today];
     }
 
-    public function edit(Request $request, Tenant $tenant): Response
+    /** The form is a modal on the tenant page; this URL just opens it. */
+    public function edit(Request $request, Tenant $tenant): RedirectResponse
     {
         Gate::authorize('update', $tenant);
 
-        return Inertia::render('tenants/form', $this->formProps($request, $tenant));
+        return redirect()->route('tenants.show', ['tenant' => $tenant, 'edit' => 1]);
     }
 
     public function update(UpdateTenantRequest $request, Tenant $tenant): RedirectResponse

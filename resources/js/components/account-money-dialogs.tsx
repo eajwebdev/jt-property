@@ -1,9 +1,9 @@
 import InputError from '@/components/input-error';
-import { selectClass } from '@/components/recurring-charge-dialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SearchSelect } from '@/components/ui/search-select';
 import { useForm } from '@inertiajs/react';
 import { FormEventHandler, useState } from 'react';
 
@@ -34,13 +34,19 @@ export function RefundDialog({ open, onOpenChange, accountId, tenant, credit }: 
                     <DialogHeader>
                         <DialogTitle>Refund {tenant}</DialogTitle>
                         <DialogDescription>
-                            Gives money back to the tenant. You can refund at most the credit on the account ({credit}). This cannot be undone except by a
-                            correcting entry.
+                            Gives money back to the tenant. You can refund at most the credit on the account ({credit}). This cannot be undone except
+                            by a correcting entry.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-2">
                         <Label htmlFor="refund-amount">Amount (pesos)</Label>
-                        <Input id="refund-amount" inputMode="decimal" value={form.data.amount} onChange={(e) => form.setData('amount', e.target.value)} required />
+                        <Input
+                            id="refund-amount"
+                            inputMode="decimal"
+                            value={form.data.amount}
+                            onChange={(e) => form.setData('amount', e.target.value)}
+                            required
+                        />
                         <InputError message={errors.amount} />
                     </div>
                     <div className="grid gap-2">
@@ -70,7 +76,8 @@ export function WriteOffDialog({ open, onOpenChange, tenant, debits }: Base & { 
     const chosen = entryId ?? debits[0]?.id ?? null;
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        if (chosen) form.post(route('ledger-entries.write-off', chosen), { preserveScroll: true, onSuccess: () => (form.reset(), onOpenChange(false)) });
+        if (chosen)
+            form.post(route('ledger-entries.write-off', chosen), { preserveScroll: true, onSuccess: () => (form.reset(), onOpenChange(false)) });
     };
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -78,21 +85,28 @@ export function WriteOffDialog({ open, onOpenChange, tenant, debits }: Base & { 
                 <form onSubmit={submit} className="space-y-4">
                     <DialogHeader>
                         <DialogTitle>Write off a debt of {tenant}</DialogTitle>
-                        <DialogDescription>The tenant no longer owes the amount you write off. It is recorded in the ledger with your reason.</DialogDescription>
+                        <DialogDescription>
+                            The tenant no longer owes the amount you write off. It is recorded in the ledger with your reason.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-2">
                         <Label htmlFor="wo-debit">Which charge</Label>
-                        <select id="wo-debit" className={selectClass} value={chosen ?? ''} onChange={(e) => setEntryId(Number(e.target.value))}>
-                            {debits.map((d) => (
-                                <option key={d.id} value={d.id}>
-                                    {d.label} - still owes {d.remaining}
-                                </option>
-                            ))}
-                        </select>
+                        <SearchSelect
+                            id="wo-debit"
+                            value={String(chosen ?? '')}
+                            onChange={(v) => setEntryId(Number(v))}
+                            options={debits.map((d) => ({ value: String(d.id), label: d.label, hint: `still owes ${d.remaining}` }))}
+                        />
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="wo-amount">Amount to write off (pesos)</Label>
-                        <Input id="wo-amount" inputMode="decimal" value={form.data.amount} onChange={(e) => form.setData('amount', e.target.value)} required />
+                        <Input
+                            id="wo-amount"
+                            inputMode="decimal"
+                            value={form.data.amount}
+                            onChange={(e) => form.setData('amount', e.target.value)}
+                            required
+                        />
                         <InputError message={errors.amount} />
                     </div>
                     <div className="grid gap-2">
@@ -115,7 +129,13 @@ export function WriteOffDialog({ open, onOpenChange, tenant, debits }: Base & { 
 }
 
 /** Owner-only: split the unallocated part of a payment over unpaid charges. */
-export function AllocateDialog({ open, onOpenChange, paymentId, unallocated, debits }: Base & { paymentId: number; unallocated: string; debits: DebitOption[] }) {
+export function AllocateDialog({
+    open,
+    onOpenChange,
+    paymentId,
+    unallocated,
+    debits,
+}: Base & { paymentId: number; unallocated: string; debits: DebitOption[] }) {
     const form = useForm<{ allocations: Record<string, string> }>({ allocations: {} });
     const errors = form.errors as Record<string, string | undefined>;
     const submit: FormEventHandler = (e) => {
@@ -129,7 +149,9 @@ export function AllocateDialog({ open, onOpenChange, paymentId, unallocated, deb
                 <form onSubmit={submit} className="space-y-4">
                     <DialogHeader>
                         <DialogTitle>Allocate payment</DialogTitle>
-                        <DialogDescription>{unallocated} of this payment is not yet applied. Enter how much goes to each unpaid charge.</DialogDescription>
+                        <DialogDescription>
+                            {unallocated} of this payment is not yet applied. Enter how much goes to each unpaid charge.
+                        </DialogDescription>
                     </DialogHeader>
                     {debits.length === 0 && <p className="text-muted-foreground text-sm">Nothing is unpaid on this account.</p>}
                     {debits.map((d) => (

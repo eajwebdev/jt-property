@@ -2,8 +2,11 @@
 
 namespace App\Services\Billing;
 
+use App\Enums\InvoiceStatus;
 use App\Enums\RentMode;
 use App\Models\ChargeCategory;
+use App\Models\Invoice;
+use App\Models\InvoiceLineItem;
 use App\Models\RentalAgreement;
 use App\Models\Unit;
 use App\Models\UnitUtility;
@@ -24,8 +27,14 @@ class UtilityAllocationService
     /** type => [label, unit of measure] */
     public const TYPES = ['electricity' => ['Electricity', 'kWh'], 'water' => ['Water', 'm³']];
 
+    /** Utilities the boarding house provides for free: never put on a bill (owner's decision). */
+    public const FREE_TYPES = ['water'];
+
     /** @var array<string, ?int> charge category id by utility type */
     private array $categories = [];
+
+    /** @var array<int, Collection<string, UnitUtility>> utility setup by unit id, for one preview/generation run */
+    private array $unitConfigs = [];
 
     public function __construct(private BillingCycleResolver $cycles) {}
 
@@ -76,6 +85,9 @@ class UtilityAllocationService
         $excluded = UtilityExclusion::where('rental_agreement_id', $agreement->id)->whereDate('bill_month', $month->toDateString())->pluck('type');
 
         foreach (self::TYPES as $type => [$name, $measure]) {
+            if (in_array($type, self::FREE_TYPES, true)) {
+                continue; // provided free: never billed, whatever is configured
+            }
             // An excluded agreement simply gets no line. Its share is NOT redistributed to the other
             // agreements of the unit (the owner's explicit choice: the owner absorbs it).
             $config = $configs->get($type);
@@ -123,6 +135,54 @@ class UtilityAllocationService
         }
 
         return ['lines' => $lines, 'needs_input' => $needsInput, 'no_occupants' => $noOccupants];
+    }
+
+    /**
+     * Utility bills entered after the agreement's bill for that month was already made ("late" bills): each one is
+     * charged once, on the agreement's next bill, split by who lived in the unit in the bill's own month. A bill is
+     * late for this agreement when it has a finalized invoice for the bill's month and no finalized invoice of the
+     * agreement carries that utility bill yet. Looks back six months.
+     *
+     * @return Collection<int, array{type: string, label: string, amount_cents: int, category_id: ?int, source: UtilityBill}>
+     */
+    public function lateLinesFor(RentalAgreement $agreement, BillingCycle $cycle): Collection
+    {
+        $month = $cycle->periodStart->startOfMonth();
+        $lines = collect();
+        $morph = (new UtilityBill)->getMorphClass();
+        // Once per unit (not per agreement): rooms without a metered/shared utility have nothing that can be late.
+        $configs = $this->unitConfigs[$agreement->unit_id] ??= UnitUtility::where('unit_id', $agreement->unit_id)->get()->keyBy('type');
+        if (! $configs->contains(fn (UnitUtility $c) => in_array($c->mode, ['metered', 'shared'], true))) {
+            return $lines;
+        }
+
+        $bills = UtilityBill::where('unit_id', $agreement->unit_id)
+            ->whereDate('bill_month', '<', $month->toDateString())
+            ->whereDate('bill_month', '>=', $month->subMonths(6)->toDateString())
+            ->orderBy('bill_month')->orderBy('id')->get();
+
+        foreach ($bills as $bill) {
+            $config = $configs->get($bill->type);
+            if ($config === null || in_array($bill->type, self::FREE_TYPES, true) || ! in_array($config->mode, ['metered', 'shared'], true)) {
+                continue;
+            }
+            $billMonth = CarbonImmutable::parse($bill->bill_month)->startOfMonth();
+            $hadBill = Invoice::where('rental_agreement_id', $agreement->id)->where('status', InvoiceStatus::Finalized)
+                ->whereYear('period_start', $billMonth->year)->whereMonth('period_start', $billMonth->month)->exists();
+            $charged = InvoiceLineItem::where('source_type', $morph)->where('source_id', $bill->id)
+                ->whereHas('invoice', fn ($q) => $q->where('rental_agreement_id', $agreement->id)->where('status', InvoiceStatus::Finalized))->exists();
+            $excluded = UtilityExclusion::where('rental_agreement_id', $agreement->id)->where('type', $bill->type)->whereDate('bill_month', $billMonth->toDateString())->exists();
+            if (! $hadBill || $charged || $excluded) {
+                continue;
+            }
+
+            $cents = ($this->split($bill, $this->eligibleWithDays($agreement->unit_id, $billMonth->year, $billMonth->month)) ?? [])[$agreement->id] ?? 0;
+            if ($cents > 0) {
+                $lines->push($this->line($bill->type, self::TYPES[$bill->type][0].' – '.$billMonth->format('F Y').' (entered late)', $cents, $bill));
+            }
+        }
+
+        return $lines;
     }
 
     private function line(string $type, string $label, int $cents, UtilityBill|UnitUtility $source): array

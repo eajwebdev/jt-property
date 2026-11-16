@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchSelect } from '@/components/ui/search-select';
 import { formatCents, parsePesos } from '@/lib/money';
 import { formatDate } from '@/lib/tenant-labels';
 import { useForm } from '@inertiajs/react';
@@ -210,8 +210,8 @@ export function ChangeRentDialog({ agreement, open, onOpenChange, today }: BaseP
             ]}
         >
             <p className="text-sm">
-                Current rent:{' '}
-                <span className="font-semibold">{rentText(agreement)}</span>{agreement.current_rent_cents !== null && ' a month'}
+                Current rent: <span className="font-semibold">{rentText(agreement)}</span>
+                {agreement.current_rent_cents !== null && ' a month'}
             </p>
             <div className="grid gap-2">
                 <Label htmlFor="change-rent">New monthly rent (pesos)</Label>
@@ -388,18 +388,17 @@ export function TransferDialog({
         >
             <div className="grid gap-2">
                 <Label htmlFor="transfer-unit">New room</Label>
-                <Select value={f.data.unit_id} onValueChange={(v) => f.setData((d) => ({ ...d, unit_id: v, bed_id: '' }))}>
-                    <SelectTrigger id="transfer-unit">
-                        <SelectValue placeholder="Choose a room" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {options.units.map((u) => (
-                            <SelectItem key={u.id} value={String(u.id)}>
-                                {u.code} - {u.rent_mode === 'whole' ? 'whole room' : 'by bed'}, {u.occupied} of {u.capacity} people
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <SearchSelect
+                    id="transfer-unit"
+                    value={String(f.data.unit_id)}
+                    onChange={(v) => f.setData((d) => ({ ...d, unit_id: v, bed_id: '' }))}
+                    placeholder="Search room…"
+                    options={options.units.map((u) => ({
+                        value: String(u.id),
+                        label: u.code,
+                        hint: `${u.rent_mode === 'whole' ? 'whole room' : 'by bed'}, ${u.occupied} of ${u.capacity} people`,
+                    }))}
+                />
                 <InputError message={f.errors.unit_id} />
             </div>
             {unit?.rent_mode === 'per_bed' && (
@@ -408,18 +407,13 @@ export function TransferDialog({
                     {unit.beds.length === 0 ? (
                         <p className="text-muted-foreground text-sm">Every bed in this room is taken.</p>
                     ) : (
-                        <Select value={f.data.bed_id} onValueChange={(v) => f.setData('bed_id', v)}>
-                            <SelectTrigger id="transfer-bed">
-                                <SelectValue placeholder="Choose a free bed" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {unit.beds.map((b) => (
-                                    <SelectItem key={b.id} value={String(b.id)}>
-                                        {b.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <SearchSelect
+                            id="transfer-bed"
+                            value={String(f.data.bed_id)}
+                            onChange={(v) => f.setData('bed_id', v)}
+                            placeholder="Choose a free bed"
+                            options={unit.beds.map((b) => ({ value: String(b.id), label: b.label }))}
+                        />
                     )}
                     <InputError message={f.errors.bed_id} />
                 </div>
@@ -534,18 +528,13 @@ export function RecordDepositDialog({
             {agreements.length > 0 && (
                 <div className="grid gap-2">
                     <Label htmlFor="deposit-agreement">For room (optional)</Label>
-                    <Select value={f.data.rental_agreement_id} onValueChange={(v) => f.setData('rental_agreement_id', v)}>
-                        <SelectTrigger id="deposit-agreement">
-                            <SelectValue placeholder="Not linked to a room" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {agreements.map((a) => (
-                                <SelectItem key={a.id} value={String(a.id)}>
-                                    Room {a.room} (from {formatDate(a.start_date)})
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <SearchSelect
+                        id="deposit-agreement"
+                        value={String(f.data.rental_agreement_id)}
+                        onChange={(v) => f.setData('rental_agreement_id', v)}
+                        placeholder="Not linked to a room"
+                        options={agreements.map((a) => ({ value: String(a.id), label: a.room, hint: `from ${formatDate(a.start_date)}` }))}
+                    />
                     <InputError message={f.errors.rental_agreement_id} />
                 </div>
             )}

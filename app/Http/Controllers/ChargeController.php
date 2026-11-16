@@ -31,7 +31,7 @@ class ChargeController extends Controller
 
         $recurring = RecurringCharge::query()
             ->whereHas('rentalAgreement', $accounts)
-            ->with(['category:id,name', 'rentalAgreement.unit:id,code', 'rentalAgreement.bed:id,label', 'rentalAgreement.billingAccount.payer:id,full_name'])
+            ->with(['category:id,name', 'rentalAgreement.unit:id,code,building', 'rentalAgreement.bed:id,label', 'rentalAgreement.billingAccount.payer:id,full_name'])
             ->orderByDesc('start_date')->orderByDesc('id')
             ->get()
             ->map(fn (RecurringCharge $c) => [
@@ -88,7 +88,7 @@ class ChargeController extends Controller
             ->currentOrFuture()
             ->whereDoesntHave('replacedBy')
             ->whereHas('billingAccount', $inProperty)
-            ->with(['unit:id,code', 'bed:id,label', 'billingAccount.payer:id,full_name'])
+            ->with(['unit:id,code,building', 'bed:id,label', 'billingAccount.payer:id,full_name'])
             ->orderBy('id')
             ->get();
 
@@ -110,6 +110,6 @@ class ChargeController extends Controller
 
     private function room(RentalAgreement $a): string
     {
-        return $a->unit->code.($a->bed ? ' / '.$a->bed->label : '');
+        return $a->unit->label.($a->bed ? ' / '.$a->bed->label : '');
     }
 }

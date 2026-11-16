@@ -52,7 +52,9 @@ class ChargeServicesTest extends TestCase
 
     public function test_default_categories_are_seeded_as_system(): void
     {
-        $this->assertSame(12, ChargeCategory::where('is_system', true)->count());
+        // 12 defaults + One Month Advance, One Month Deposit, Door Key Deposit (Statement of Accounts columns).
+        $this->assertSame(15, ChargeCategory::where('is_system', true)->count());
+        $this->assertSame(3, ChargeCategory::whereIn('name', ['One Month Advance', 'One Month Deposit', 'Door Key Deposit'])->where('is_system', true)->count());
         $this->assertTrue(ChargeCategory::where('name', 'Rice cooker')->where('kind', 'appliance')->exists());
     }
 

@@ -1,17 +1,20 @@
 import { ChangeRentDialog, MoveOutDialog, MoveOutResidentDialog, RecordDepositDialog, TransferDialog } from '@/components/agreement-action-dialogs';
+import { PageHeader } from '@/components/page-header';
 import { AddRecurringChargeDialog, type Category } from '@/components/recurring-charge-dialog';
 import StartRentalDialog, { type RentalOptions } from '@/components/start-rental-dialog';
+import TenantFormDialog, { type TenantFormData } from '@/components/tenant-form-dialog';
 import TenantStatusBadge, { NoEmailBadge } from '@/components/tenant-status-badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useUrlModal } from '@/hooks/use-url-modal';
 import AppLayout from '@/layouts/app-layout';
 import { formatCents } from '@/lib/money';
 import { agreementStatusLabels, deliveryLabels, depositStatusLabels, formatDate } from '@/lib/tenant-labels';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowRightLeft, Banknote, DoorOpen, KeyRound, Pencil, PiggyBank, Plus } from 'lucide-react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { ArrowRightLeft, Banknote, DoorOpen, KeyRound, Pencil, PiggyBank, Plus, UserRound } from 'lucide-react';
 import { useState } from 'react';
 
 interface Rate {
@@ -64,8 +67,17 @@ interface Props {
         archived_at: string | null;
     };
     accounts: Account[];
-    occupancies: { id: number; room: string; move_in_date: string; move_out_date: string | null; is_payer: boolean; replaced: boolean; open: boolean }[];
+    occupancies: {
+        id: number;
+        room: string;
+        move_in_date: string;
+        move_out_date: string | null;
+        is_payer: boolean;
+        replaced: boolean;
+        open: boolean;
+    }[];
     canEdit: boolean;
+    form: TenantFormData | null;
     canArchive: boolean;
     canStartRental: boolean;
     rentalOptions: RentalOptions | null;
@@ -90,6 +102,7 @@ export default function Show({
     accounts,
     occupancies,
     canEdit,
+    form,
     canArchive,
     canStartRental,
     rentalOptions,
@@ -98,6 +111,7 @@ export default function Show({
     today,
 }: Props) {
     const [rentalOpen, setRentalOpen] = useState(false);
+    const [editing, setEditing] = useUrlModal('edit');
     // The last chosen action stays mounted while the dialog closes so its exit animation can play.
     const [action, setAction] = useState<Action | null>(null);
     const [actionOpen, setActionOpen] = useState(false);
@@ -126,32 +140,36 @@ export default function Show({
             <Head title={tenant.full_name} />
 
             <div className="mx-auto w-full max-w-5xl space-y-6 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="space-y-1">
-                        <h1 className="text-2xl font-semibold tracking-tight">{tenant.full_name}</h1>
-                        <p className="text-muted-foreground text-sm">{tenant.property}</p>
-                        {tenant.archived_at && <TenantStatusBadge status="archived" date={tenant.archived_at} />}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {canStartRental && rentalOptions && (
-                            <Button size="lg" onClick={() => setRentalOpen(true)}>
-                                <KeyRound /> Start rental
-                            </Button>
-                        )}
-                        {canEdit && (
-                            <Button asChild variant="outline" size="lg">
-                                <Link href={route('tenants.edit', tenant.id)}>
+                <PageHeader
+                    icon={UserRound}
+                    title={tenant.full_name}
+                    description={tenant.property}
+                    actions={
+                        <>
+                            {canStartRental && rentalOptions && (
+                                <Button onClick={() => setRentalOpen(true)}>
+                                    <KeyRound /> Start rental
+                                </Button>
+                            )}
+                            {canEdit && form && (
+                                <Button variant="outline" onClick={() => setEditing(true)}>
                                     <Pencil /> Edit
-                                </Link>
-                            </Button>
-                        )}
-                        {canArchive && (
-                            <Button variant="outline" size="lg" onClick={archive}>
-                                Archive
-                            </Button>
-                        )}
-                    </div>
-                </div>
+                                </Button>
+                            )}
+                            {canArchive && (
+                                <Button variant="outline" onClick={archive}>
+                                    Archive
+                                </Button>
+                            )}
+                        </>
+                    }
+                >
+                    {tenant.archived_at && (
+                        <div className="mt-2">
+                            <TenantStatusBadge status="archived" date={tenant.archived_at} />
+                        </div>
+                    )}
+                </PageHeader>
 
                 {flash.success && (
                     <Alert role="status">
@@ -201,7 +219,7 @@ export default function Show({
                                 <CardContent className="space-y-4">
                                     {account.agreements.length === 0 && <p className="text-muted-foreground text-sm">No rental yet</p>}
                                     {account.agreements.map((a) => (
-                                        <div key={a.id} className="space-y-2 rounded-lg border p-3">
+                                        <div key={a.id} className="surface space-y-2 p-3">
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <p className="font-medium">Room {a.room}</p>
                                                 <Badge variant="outline">{agreementStatusLabels[a.status] ?? a.status}</Badge>
@@ -212,7 +230,8 @@ export default function Show({
                                             </p>
                                             {a.current_rent_cents === null && a.first_rent_cents != null && (
                                                 <p className="text-sm">
-                                                    Starts {formatDate(a.start_date)}: <span className="font-medium">{formatCents(a.first_rent_cents)}</span> a month
+                                                    Starts {formatDate(a.start_date)}:{' '}
+                                                    <span className="font-medium">{formatCents(a.first_rent_cents)}</span> a month
                                                 </p>
                                             )}
                                             {a.replaced && (
@@ -393,6 +412,7 @@ export default function Show({
                     today={today}
                 />
             )}
+            {form && <TenantFormDialog open={editing} onOpenChange={setEditing} form={form} />}
         </AppLayout>
     );
 }

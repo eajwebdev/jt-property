@@ -90,6 +90,11 @@ class Invoice extends Model
         return $this->hasMany(LedgerEntry::class);
     }
 
+    public function emailDeliveries(): HasMany
+    {
+        return $this->hasMany(EmailDelivery::class);
+    }
+
     public function voider(): BelongsTo
     {
         return $this->belongsTo(User::class, 'voided_by');

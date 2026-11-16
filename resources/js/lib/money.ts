@@ -22,3 +22,12 @@ export function parsePesos(input: string): number | null {
     if (whole.replace(/^0+/, '').length > 13) return null;
     return Number(whole) * 100 + Number((m[2] ?? '').padEnd(2, '0'));
 }
+
+/** Short peso label for chart axes and tiles: ₱950, ₱12.5k, ₱1.2M. Display only. */
+export function formatCentsCompact(cents: number): string {
+    const pesos = Math.abs(cents) / 100;
+    const sign = cents < 0 ? '-' : '';
+    if (pesos >= 1_000_000) return `${sign}₱${(pesos / 1_000_000).toFixed(pesos >= 10_000_000 ? 0 : 1).replace(/\.0$/, '')}M`;
+    if (pesos >= 1_000) return `${sign}₱${(pesos / 1_000).toFixed(pesos >= 10_000 ? 0 : 1).replace(/\.0$/, '')}k`;
+    return `${sign}₱${Math.round(pesos)}`;
+}

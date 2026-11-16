@@ -44,7 +44,7 @@ class RentalAgreementController extends Controller
         );
 
         return redirect()->route('tenants.show', $tenant)
-            ->with('success', "Rental started for {$tenant->full_name} in room {$unit->code}".($agreement->bed ? " / {$agreement->bed->label}" : '').'.');
+            ->with('success', "Rental started for {$tenant->full_name} in room {$unit->label}".($agreement->bed ? " / {$agreement->bed->label}" : '').'.');
     }
 
     public function changeRent(ChangeRentRequest $request, RentalAgreement $agreement, TenancyService $tenancy): RedirectResponse
@@ -80,6 +80,6 @@ class RentalAgreementController extends Controller
             $data['reason'],
         );
 
-        return back()->with('success', "Moved to room {$new->unit->code}".($new->bed ? " / {$new->bed->label}" : '').' from '.$new->start_date->format('M j, Y').'.');
+        return back()->with('success', "Moved to room {$new->unit->label}".($new->bed ? " / {$new->bed->label}" : '').' from '.$new->start_date->format('M j, Y').'.');
     }
 }

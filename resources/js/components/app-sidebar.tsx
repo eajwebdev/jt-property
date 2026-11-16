@@ -1,50 +1,45 @@
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
-import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/react';
-import { Building2, FileText, History, LayoutGrid, Receipt, Users, Wallet } from 'lucide-react';
+import { type NavItem, type SharedData } from '@/types';
+import { Link, usePage } from '@inertiajs/react';
+import { BarChart3, Building2, CalendarDays, FileText, History, LayoutGrid, Receipt, ScrollText, Users, Wallet } from 'lucide-react';
 import AppLogo from './app-logo';
 
-const mainNavItems: NavItem[] = [
+const groups: { label: string; items: NavItem[]; ownerOnly?: NavItem[] }[] = [
     {
-        title: 'Dashboard',
-        url: '/dashboard',
-        icon: LayoutGrid,
+        label: 'Overview',
+        items: [
+            { title: 'Dashboard', url: '/dashboard', icon: LayoutGrid },
+            { title: 'Calendar', url: '/calendar', icon: CalendarDays },
+        ],
     },
     {
-        title: 'Properties',
-        url: '/properties',
-        icon: Building2,
+        label: 'Rentals',
+        items: [
+            { title: 'Properties', url: '/properties', icon: Building2 },
+            { title: 'Tenants', url: '/tenants', icon: Users },
+        ],
     },
     {
-        title: 'Tenants',
-        url: '/tenants',
-        icon: Users,
+        label: 'Money',
+        items: [
+            { title: 'Charges & Utilities', url: '/charges', icon: Receipt },
+            { title: 'Billing', url: '/billing', icon: FileText },
+            { title: 'Collections', url: '/collections', icon: Wallet },
+            { title: 'Opening Balances', url: '/opening-balances', icon: History },
+        ],
     },
     {
-        title: 'Charges & Utilities',
-        url: '/charges',
-        icon: Receipt,
-    },
-    {
-        title: 'Billing',
-        url: '/billing',
-        icon: FileText,
-    },
-    {
-        title: 'Collections',
-        url: '/collections',
-        icon: Wallet,
-    },
-    {
-        title: 'Opening Balances',
-        url: '/opening-balances',
-        icon: History,
+        label: 'Insights',
+        items: [{ title: 'Reports', url: '/reports', icon: BarChart3 }],
+        ownerOnly: [{ title: 'Audit log', url: '/audit', icon: ScrollText }],
     },
 ];
 
 export function AppSidebar() {
+    const { auth } = usePage<SharedData>().props;
+    const isOwner = (auth.user as { role?: string }).role === 'owner';
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -60,7 +55,13 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                {groups.map((group) => (
+                    <NavMain
+                        key={group.label}
+                        label={group.label}
+                        items={isOwner && group.ownerOnly ? [...group.items, ...group.ownerOnly] : group.items}
+                    />
+                ))}
             </SidebarContent>
 
             <SidebarFooter>

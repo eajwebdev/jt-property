@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\RentMode;
 use App\Enums\UnitStatus;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,6 +24,12 @@ class Unit extends Model
             'rent_mode' => RentMode::class,
             'status' => UnitStatus::class,
         ];
+    }
+
+    /** How a room is shown everywhere: "Creekside House - Room #5", or just the code when there is no building. */
+    protected function label(): Attribute
+    {
+        return Attribute::get(fn () => $this->building ? "{$this->building} - {$this->code}" : $this->code);
     }
 
     public function property(): BelongsTo

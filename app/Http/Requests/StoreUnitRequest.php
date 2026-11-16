@@ -30,7 +30,9 @@ class StoreUnitRequest extends FormRequest
 
     protected function uniqueCode(): Unique
     {
-        return Rule::unique('units', 'code')->where('property_id', $this->propertyId());
+        // Unique per building: "Room #2" may exist in Creekside House and in BIND House (see building_key).
+        return Rule::unique('units', 'code')->where('property_id', $this->propertyId())
+            ->where('building_key', trim((string) $this->input('building')));
     }
 
     /**
@@ -53,7 +55,7 @@ class StoreUnitRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'code.unique' => 'This property already has a room with that code.',
+            'code.unique' => 'This building already has a room with that code.',
             'capacity.min' => 'A room must fit at least 1 person.',
         ];
     }

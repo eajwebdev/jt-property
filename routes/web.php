@@ -1,17 +1,24 @@
 <?php
 
+use App\Http\Controllers\AccountStatementController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ChargeCategoryController;
 use App\Http\Controllers\ChargeController;
 use App\Http\Controllers\CollectionsController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceStatementController;
+use App\Http\Controllers\LandingController;
 use App\Http\Controllers\OccupancyController;
 use App\Http\Controllers\OneTimeChargeController;
 use App\Http\Controllers\OpeningBalanceController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PropertyController;
+use App\Http\Controllers\PropertyPhotoController;
 use App\Http\Controllers\RecurringChargeController;
 use App\Http\Controllers\RentalAgreementController;
+use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\SecurityDepositController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\UnitController;
@@ -19,18 +26,26 @@ use App\Http\Controllers\UtilityBillController;
 use App\Http\Controllers\UtilityController;
 use App\Http\Controllers\UtilityExclusionController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
-// No public landing page: guests are sent to login by the dashboard's auth middleware.
-Route::redirect('/', '/dashboard')->name('home');
+// Public website: listed boarding houses with photos and free places. Staff log in from the header.
+Route::get('/', [LandingController::class, 'index'])->name('home');
+Route::get('places/{code}', [LandingController::class, 'show'])->where('code', '[A-Z0-9]{2,10}')->name('listings.show');
+Route::get('property-photos/{photo}', [PropertyPhotoController::class, 'show'])->name('property-photos.show');
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('dashboard', function () {
-        return Inertia::render('dashboard');
-    })->name('dashboard');
+    Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('calendar', CalendarController::class)->name('calendar.index');
+    Route::get('audit', AuditLogController::class)->middleware('role:owner')->name('audit.index');
+    Route::get('reports', [ReportsController::class, 'index'])->name('reports.index');
+    Route::get('reports/overview.pdf', [ReportsController::class, 'pdf'])->name('reports.pdf');
+    Route::get('reports/statement-of-accounts.pdf', [ReportsController::class, 'statementOfAccounts'])->name('reports.statement-of-accounts');
+    Route::get('reports/aging.csv', [ReportsController::class, 'export'])->name('reports.aging.csv');
 
     Route::resource('properties', PropertyController::class)->except('destroy');
     Route::resource('properties.units', UnitController::class)->shallow()->only(['store', 'update']);
+    Route::post('properties/{property}/photos', [PropertyPhotoController::class, 'store'])->name('properties.photos.store');
+    Route::patch('property-photos/{photo}', [PropertyPhotoController::class, 'update'])->name('property-photos.update');
+    Route::delete('property-photos/{photo}', [PropertyPhotoController::class, 'destroy'])->name('property-photos.destroy');
     Route::resource('tenants', TenantController::class)->except('destroy');
     Route::patch('tenants/{tenant}/archive', [TenantController::class, 'archive'])->name('tenants.archive');
     Route::post('tenants/{tenant}/agreements', [RentalAgreementController::class, 'store'])->name('tenants.agreements.store');
@@ -56,12 +71,15 @@ Route::middleware(['auth'])->group(function () {
     Route::post('opening-balances/{openingBalance}/approve', [OpeningBalanceController::class, 'approve'])->name('opening-balances.approve');
     Route::post('opening-balances/{openingBalance}/reverse', [OpeningBalanceController::class, 'reverse'])->name('opening-balances.reverse');
     Route::get('collections', [CollectionsController::class, 'index'])->name('collections.index');
+    Route::get('accounts/{account}/statement', [AccountStatementController::class, 'show'])->name('accounts.statement');
+    Route::get('accounts/{account}/statement.pdf', [AccountStatementController::class, 'download'])->name('accounts.statement.pdf');
     Route::get('accounts/{account}/payments/preview', [PaymentController::class, 'preview'])->name('accounts.payments.preview');
     Route::post('accounts/{account}/payments', [PaymentController::class, 'store'])->name('accounts.payments.store');
     Route::post('accounts/{account}/refunds', [PaymentController::class, 'refund'])->name('accounts.refunds.store');
     Route::post('ledger-entries/{entry}/write-off', [PaymentController::class, 'writeOff'])->name('ledger-entries.write-off');
     Route::get('payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
     Route::get('payments/{payment}/proof', [PaymentController::class, 'proof'])->name('payments.proof');
+    Route::get('payments/{payment}/acknowledgment.pdf', [PaymentController::class, 'acknowledgment'])->name('payments.acknowledgment');
     Route::post('payments/{payment}/approve', [PaymentController::class, 'approve'])->name('payments.approve');
     Route::post('payments/{payment}/reverse', [PaymentController::class, 'reverse'])->name('payments.reverse');
     Route::post('payments/{payment}/allocate', [PaymentController::class, 'allocate'])->name('payments.allocate');
@@ -71,9 +89,17 @@ Route::middleware(['auth'])->group(function () {
     Route::get('billing', [BillingController::class, 'index'])->name('billing.index');
     Route::post('billing/generate', [BillingController::class, 'generate'])->name('billing.generate');
     Route::get('billing/batches/{batch}', [BillingController::class, 'showBatch'])->name('billing.batches.show');
+    Route::get('billing/batches/{batch}/download.zip', [BillingController::class, 'downloadBatch'])->name('billing.batches.zip');
+    Route::get('billing/batches/{batch}/combined.pdf', [BillingController::class, 'combinedBatch'])->name('billing.batches.combined');
+    Route::post('billing/batches/{batch}/email', [BillingController::class, 'emailBatch'])->name('billing.batches.email');
+    Route::post('billing/void-month', [BillingController::class, 'voidMonth'])->name('billing.void-month');
+    Route::post('billing/electricity', [BillingController::class, 'electricity'])->name('billing.electricity');
+    Route::post('billing/email-month', [BillingController::class, 'emailMonth'])->name('billing.email-month');
+    Route::post('billing/test-email', [BillingController::class, 'testEmail'])->middleware('throttle:3,1')->name('billing.test-email');
     Route::post('billing/batch-items/{item}/retry', [BillingController::class, 'retry'])->name('billing.items.retry');
     Route::get('invoices', [BillingController::class, 'invoices'])->name('invoices.index');
     Route::get('invoices/{invoice}', [BillingController::class, 'show'])->name('invoices.show');
+    Route::post('invoices/{invoice}/email', [BillingController::class, 'emailInvoice'])->name('invoices.email');
     Route::post('invoices/{invoice}/void', [BillingController::class, 'void'])->name('invoices.void');
     Route::post('charge-categories', [ChargeCategoryController::class, 'store'])->name('charge-categories.store');
     Route::patch('charge-categories/{category}', [ChargeCategoryController::class, 'update'])->name('charge-categories.update');

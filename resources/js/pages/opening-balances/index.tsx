@@ -1,17 +1,18 @@
 import InputError from '@/components/input-error';
 import { OpeningBalanceWizard, type WizardAccount } from '@/components/opening-balance-wizard';
-import { selectClass } from '@/components/recurring-charge-dialog';
+import { PageHeader } from '@/components/page-header';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SearchSelect } from '@/components/ui/search-select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/tenant-labels';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Upload } from 'lucide-react';
+import { History, Upload } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 
 type Status = 'none' | 'pending' | 'approved' | 'reversed';
@@ -106,7 +107,7 @@ function PendingDialog({ row, onClose }: { row: Row | null; onClose: () => void 
                     </DialogTitle>
                     <DialogDescription>Nothing is posted until you approve.</DialogDescription>
                 </DialogHeader>
-                <p className="rounded-lg border p-4 text-sm">
+                <p className="surface p-4 text-sm">
                     This will post <strong>{row.amount}</strong> as Balance Brought Forward on <strong>{row.account_no}</strong>. It will not be
                     billed as rent.
                 </p>
@@ -188,21 +189,19 @@ export default function OpeningBalancesIndex({ accounts, properties, filters, ca
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Opening Balances" />
-            <div className="space-y-6 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-semibold">Opening Balances</h1>
-                        <p className="text-muted-foreground max-w-2xl text-sm">
-                            Unpaid debt from before the JT system. Each account gets one, posted once as Balance Brought Forward. It is never billed
-                            as rent and never mixed with deposits or advances.
-                        </p>
-                    </div>
-                    {canManage && (
-                        <Button variant="outline" onClick={() => setImporting(true)}>
-                            <Upload /> Import CSV
-                        </Button>
-                    )}
-                </div>
+            <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6">
+                <PageHeader
+                    icon={History}
+                    title="Opening Balances"
+                    description="Unpaid debt from before the JT system. Each account gets one, posted once as Balance Brought Forward. It is never billed as rent and never mixed with deposits or advances."
+                    actions={
+                        canManage && (
+                            <Button variant="outline" onClick={() => setImporting(true)}>
+                                <Upload /> Import CSV
+                            </Button>
+                        )
+                    }
+                />
 
                 {flash?.success && (
                     <Alert>
@@ -216,7 +215,7 @@ export default function OpeningBalancesIndex({ accounts, properties, filters, ca
                             Import results: {importResult.created} saved, {importResult.errors.length} not saved
                         </h2>
                         {importResult.errors.length > 0 && (
-                            <div className="overflow-x-auto rounded-lg border">
+                            <div className="surface overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead className="bg-muted/50 text-left">
                                         <tr>
@@ -243,25 +242,19 @@ export default function OpeningBalancesIndex({ accounts, properties, filters, ca
 
                 <div className="flex items-center gap-2">
                     <Label htmlFor="ob-property">Property</Label>
-                    <select
+                    <SearchSelect
                         id="ob-property"
-                        className={selectClass + ' max-w-xs'}
-                        value={filters.property_id ?? ''}
-                        onChange={(e) => filter(e.target.value)}
-                    >
-                        <option value="">All properties</option>
-                        {properties.map((p) => (
-                            <option key={p.id} value={p.id}>
-                                {p.name}
-                            </option>
-                        ))}
-                    </select>
+                        className="max-w-xs"
+                        value={String(filters.property_id ?? '')}
+                        onChange={(v) => filter(v)}
+                        options={[{ value: '', label: 'All properties' }, ...properties.map((p) => ({ value: String(p.id), label: p.name }))]}
+                    />
                 </div>
 
                 {accounts.length === 0 ? (
                     <p className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">No billing accounts yet.</p>
                 ) : (
-                    <div className="overflow-x-auto rounded-lg border">
+                    <div className="surface overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead className="bg-muted/50 text-left">
                                 <tr>

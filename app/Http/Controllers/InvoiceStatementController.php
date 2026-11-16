@@ -28,7 +28,7 @@ class InvoiceStatementController extends Controller
 
         $path = $this->service->render($invoice, $request->user());
 
-        return Storage::disk('local')->download($path, $invoice->number.'.pdf', ['Content-Type' => 'application/pdf']);
+        return Storage::disk('local')->response($path, $invoice->number.'.pdf', ['Content-Type' => 'application/pdf']);
     }
 
     /** A new copy of the issued statement, re-rendered from the snapshot totals. */
@@ -38,6 +38,6 @@ class InvoiceStatementController extends Controller
 
         $bytes = $this->service->copy($invoice);
 
-        return response()->streamDownload(fn () => print ($bytes), $invoice->number.'-copy.pdf', ['Content-Type' => 'application/pdf']);
+        return response()->streamDownload(fn () => print ($bytes), $invoice->number.'-copy.pdf', ['Content-Type' => 'application/pdf'], 'inline');
     }
 }

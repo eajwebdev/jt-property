@@ -1,16 +1,18 @@
 import InputError from '@/components/input-error';
-import { selectClass } from '@/components/recurring-charge-dialog';
+import { PageHeader } from '@/components/page-header';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SearchSelect } from '@/components/ui/search-select';
 import AppLayout from '@/layouts/app-layout';
 import { formatCents, parsePesos } from '@/lib/money';
 import { formatFixed, meteredAmountCents, parseReading } from '@/lib/quantity';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { ArrowLeft, Zap } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 
 type UtilityType = 'electricity' | 'water';
@@ -61,7 +63,7 @@ interface Props {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Charges & Utilities', href: '/charges' },
-    { title: 'Water & electricity', href: '/utilities' },
+    { title: 'Electricity', href: '/utilities' },
 ];
 const names: Record<UtilityType, string> = { electricity: 'Electricity', water: 'Water' };
 const measure: Record<UtilityType, string> = { electricity: 'kWh', water: 'm³' };
@@ -281,18 +283,12 @@ function ConfigDialog({ unit, type, onClose }: { unit: UnitRow; type: UtilityTyp
                     </DialogHeader>
                     <div className="grid gap-2">
                         <Label htmlFor="cf-mode">How is it billed?</Label>
-                        <select
+                        <SearchSelect
                             id="cf-mode"
-                            className={selectClass}
                             value={form.data.mode}
-                            onChange={(e) => form.setData('mode', e.target.value as Mode)}
-                        >
-                            {(Object.keys(modeLabels) as Mode[]).map((m) => (
-                                <option key={m} value={m}>
-                                    {modeLabels[m]}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(v) => form.setData('mode', v as Mode)}
+                            options={(Object.keys(modeLabels) as Mode[]).map((m) => ({ value: m, label: modeLabels[m] }))}
+                        />
                     </div>
                     {form.data.mode === 'fixed' && (
                         <div className="grid gap-2">
@@ -334,18 +330,12 @@ function ConfigDialog({ unit, type, onClose }: { unit: UnitRow; type: UtilityTyp
                     {needsSplit && (
                         <div className="grid gap-2">
                             <Label htmlFor="cf-split">How is it shared between tenants?</Label>
-                            <select
+                            <SearchSelect
                                 id="cf-split"
-                                className={selectClass}
                                 value={form.data.split_method}
-                                onChange={(e) => form.setData('split_method', e.target.value as typeof split)}
-                            >
-                                {Object.entries(splitLabels).map(([k, label]) => (
-                                    <option key={k} value={k}>
-                                        {label}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(v) => form.setData('split_method', v as typeof split)}
+                                options={Object.entries(splitLabels).map(([k, label]) => ({ value: k, label }))}
+                            />
                             <InputError message={errors.split_method} />
                         </div>
                     )}
@@ -448,18 +438,20 @@ export default function Utilities({ month, canConfigure, units }: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Water & electricity" />
-            <div className="mx-auto w-full max-w-5xl space-y-6 p-4">
-                <div className="space-y-2">
-                    <h1 className="text-2xl font-semibold tracking-tight">Water &amp; electricity</h1>
-                    <p className="text-muted-foreground text-sm">
-                        Enter each room&apos;s meter reading or master bill. A month with nothing entered is held back from billing, never billed as
-                        zero.
-                    </p>
-                    <Button asChild variant="outline" size="sm">
-                        <Link href={route('charges.index')}>Back to charges</Link>
-                    </Button>
-                </div>
+            <Head title="Electricity" />
+            <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-6">
+                <PageHeader
+                    icon={Zap}
+                    title="Electricity"
+                    description="Enter each room's electric meter reading or bill. Not entered yet? The bill shows “not yet entered” and the electricity is added to the next bill. Water is free and never billed."
+                    actions={
+                        <Button asChild variant="outline">
+                            <Link href={route('charges.index')}>
+                                <ArrowLeft /> Back to charges
+                            </Link>
+                        </Button>
+                    }
+                />
 
                 {flash.success && (
                     <Alert role="status">
@@ -490,7 +482,7 @@ export default function Utilities({ month, canConfigure, units }: Props) {
                                 Room {unit.code} <span className="text-muted-foreground text-sm font-normal">{unit.property}</span>
                             </h2>
                             <ul className="divide-y rounded-lg border">
-                                {(['electricity', 'water'] as const).map((type) => (
+                                {(['electricity'] as const).map((type) => (
                                     <UtilityRow
                                         key={type}
                                         unit={unit}

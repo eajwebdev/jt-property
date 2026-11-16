@@ -96,6 +96,8 @@ class OpeningBalanceController extends Controller
             'breakdown.*.month' => ['required', 'date_format:Y-m'],
             'breakdown.*.amount' => ['required', 'string', new Pesos('monthly amount')],
             'breakdown.*.note' => ['nullable', 'string', 'max:255'],
+            // BH (rent) / EB (electric) / other: decides the Statement of Accounts column the line is shown in.
+            'breakdown.*.category' => ['nullable', 'in:rent,electric,other'],
             'approve' => ['nullable', 'boolean'],
         ]);
 
@@ -103,6 +105,7 @@ class OpeningBalanceController extends Controller
             'month' => $b['month'],
             'amount_cents' => Money::toCents($b['amount']),
             'note' => ($b['note'] ?? null) ?: null,
+            'category' => ($b['category'] ?? null) ?: 'other',
         ])->values()->all();
 
         $ob = DB::transaction(function () use ($data, $breakdown, $request) {

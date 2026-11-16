@@ -22,7 +22,7 @@ class StoreUserRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
-            'role' => ['required', Rule::enum(Role::class)],
+            'role' => ['required', Rule::in([Role::Owner->value, Role::Staff->value])],
             'password' => ['required', 'confirmed', Password::defaults()],
         ];
     }

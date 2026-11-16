@@ -9,7 +9,9 @@ use App\Http\Requests\StorePropertyRequest;
 use App\Http\Requests\UpdatePropertyRequest;
 use App\Models\Occupancy;
 use App\Models\Property;
+use App\Models\PropertyPhoto;
 use App\Models\User;
+use App\Services\PropertyPhotoService;
 use App\Support\Audit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,7 +30,7 @@ class PropertyController extends Controller
         $query = $user->role === Role::Staff ? $user->properties() : Property::query();
 
         $properties = $query
-            ->with(['units' => fn ($q) => $q->withCount(['occupancies as occupied_count' => fn ($o) => $o->activeOn(today())])])
+            ->with(['photos', 'units' => fn ($q) => $q->withCount(['occupancies as occupied_count' => fn ($o) => $o->activeOn(today())])])
             ->orderBy('name')
             ->get()
             ->map(fn (Property $property) => [
@@ -37,6 +39,8 @@ class PropertyController extends Controller
                 'code' => $property->code,
                 'type' => $property->type->value,
                 'address' => $property->address,
+                'cover' => $property->photos->first()?->url(),
+                'show_on_website' => $property->show_on_website,
                 'rooms' => $property->units->count(),
                 'capacity' => $property->units->sum('capacity'),
                 'occupied' => $property->units->sum('occupied_count'),
@@ -45,17 +49,21 @@ class PropertyController extends Controller
                     ->sum(fn ($unit) => max($unit->capacity - $unit->occupied_count, 0)),
             ]);
 
+        $canManage = $user->can('create', Property::class);
+
         return Inertia::render('properties/index', [
             'properties' => $properties,
-            'canManage' => $user->can('create', Property::class),
+            'canManage' => $canManage,
+            'form' => $canManage ? $this->formProps(new Property, []) : null,
         ]);
     }
 
-    public function create(): Response
+    /** The form is a modal on the list page; this URL just opens it. */
+    public function create(): RedirectResponse
     {
         Gate::authorize('create', Property::class);
 
-        return Inertia::render('properties/form', $this->formProps(new Property, []));
+        return redirect()->route('properties.index', ['create' => 1]);
     }
 
     public function store(StorePropertyRequest $request): RedirectResponse
@@ -110,18 +118,22 @@ class PropertyController extends Controller
         $canManage = request()->user()->can('update', $property);
 
         return Inertia::render('properties/show', [
-            'property' => array_merge($property->only(['id', 'name', 'code', 'address', 'description', 'amenities']), ['type' => $property->type->value]),
+            'property' => array_merge($property->only(['id', 'name', 'code', 'address', 'description', 'amenities', 'show_on_website']), ['type' => $property->type->value]),
+            'photos' => $property->photos()->get()->map(fn (PropertyPhoto $photo) => $photo->toCard())->values(),
+            'maxPhotos' => PropertyPhotoService::MAX_PHOTOS,
             'units' => $units,
             'staff' => $canManage ? $property->users()->orderBy('name')->get(['users.id', 'users.name']) : [],
             'canManage' => $canManage,
+            'form' => $canManage ? $this->formProps($property, $property->users()->pluck('users.id')->all()) : null,
         ]);
     }
 
-    public function edit(Property $property): Response
+    /** The form is a modal on the property page; this URL just opens it. */
+    public function edit(Property $property): RedirectResponse
     {
         Gate::authorize('update', $property);
 
-        return Inertia::render('properties/form', $this->formProps($property, $property->users()->pluck('users.id')->all()));
+        return redirect()->route('properties.show', ['property' => $property, 'edit' => 1]);
     }
 
     public function update(UpdatePropertyRequest $request, Property $property): RedirectResponse
@@ -169,7 +181,7 @@ class PropertyController extends Controller
     {
         return [
             'property' => $property->exists
-                ? array_merge($property->only(['id', 'name', 'code', 'address', 'description', 'amenities']), ['type' => $property->type->value, 'has_billing' => $property->billingAccounts()->exists()])
+                ? array_merge($property->only(['id', 'name', 'code', 'address', 'dti_registration_no', 'business_permit_no', 'description', 'amenities', 'auto_send_email', 'show_on_website']), ['type' => $property->type->value, 'has_billing' => $property->billingAccounts()->exists()])
                 : null,
             'staff_ids' => $selected,
             'types' => collect(PropertyType::cases())->map->value,

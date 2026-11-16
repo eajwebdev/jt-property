@@ -34,7 +34,7 @@ class CollectionsController extends Controller
         $accounts = BillingAccount::query()
             ->when($user->role === Role::Staff, fn (Builder $q) => $q->whereIn('property_id', $user->properties()->select('properties.id')))
             ->when($propertyId, fn (Builder $q) => $q->where('property_id', $propertyId))
-            ->with(['payer:id,full_name', 'property:id,name', 'agreements' => fn ($q) => $q->orderByRaw("status = 'active' desc")->orderByDesc('id'), 'agreements.unit:id,code'])
+            ->with(['payer:id,full_name', 'property:id,name', 'agreements' => fn ($q) => $q->orderByRaw("status = 'active' desc")->orderByDesc('id'), 'agreements.unit:id,code,building'])
             ->orderBy('id')->get();
 
         $ids = $accounts->pluck('id')->all();
@@ -55,7 +55,7 @@ class CollectionsController extends Controller
                 'tenant' => $a->payer->full_name,
                 'property' => $a->property->name,
                 'property_id' => $a->property_id,
-                'room' => $a->agreements->first()?->unit?->code,
+                'room' => $a->agreements->first()?->unit?->label,
                 'balance_cents' => $balance,
                 'balance' => Money::format(abs($balance)),
                 'is_credit' => $balance < 0,

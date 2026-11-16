@@ -195,7 +195,7 @@ class ChargesHttpTest extends TestCase
         $owner = User::factory()->owner()->create();
         $this->actingAs($owner)->get(route('charges.index'))->assertInertia(fn (Assert $page) => $page
             ->component('charges/index')
-            ->has('recurring', 2)->has('oneTime', 1)->has('categories', 12)->where('canManage', true));
+            ->has('recurring', 2)->has('oneTime', 1)->has('categories', 15)->where('canManage', true));
 
         $staff = User::factory()->create();
         $staff->properties()->attach($this->property);

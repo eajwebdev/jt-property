@@ -3,14 +3,18 @@
 namespace App\Services\Billing;
 
 use App\Enums\InvoiceStatus;
+use App\Enums\LedgerEntryType;
 use App\Enums\Role;
 use App\Models\BillingAccount;
 use App\Models\Invoice;
+use App\Models\LedgerEntry;
+use App\Models\OpeningBalance;
 use App\Models\RentalAgreement;
 use App\Models\User;
 use App\Models\UtilityBill;
 use Carbon\CarbonImmutable;
 use DomainException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /** Dry run of a month's bills. Reads only; generation (Task 3.7) posts exactly the lines built here. */
@@ -28,9 +32,9 @@ class BillingPreviewService
      * @param  list<int>|null  $agreementIds
      * @return array{rows: list<PreviewRow>, summary: array{counts: array<string, int>, total_new_charges_cents: int, total_previous_outstanding_cents: int, estimated_statement_total_cents: int}}
      */
-    public function preview(int $year, int $month, ?int $propertyId = null, ?array $agreementIds = null, ?User $for = null): array
+    public function preview(int $year, int $month, ?int $propertyId = null, ?array $agreementIds = null, ?User $for = null, ?array $accountIds = null): array
     {
-        $agreements = $this->agreements($year, $month, $propertyId, $agreementIds, $for);
+        $agreements = $this->agreements($year, $month, $propertyId, $agreementIds, $for, $accountIds);
 
         $cycles = $agreements->mapWithKeys(fn (RentalAgreement $a) => [$a->id => $this->cycles->cycleFor($a, $year, $month)])->filter();
         // Every invoice (any status) of these agreements for their cycle: finalized ones make the row
@@ -49,6 +53,12 @@ class BillingPreviewService
             $own = $invoices->get($a->id, collect());
             $stored = $own->first(fn (Invoice $i) => $i->status === InvoiceStatus::Finalized);
             $previous = $this->ledger->previousBalance($a->billingAccount, $cycle->periodStart, $own->pluck('id')->all());
+            $paymentsSince = (int) LedgerEntry::where('billing_account_id', $a->billing_account_id)
+                ->whereIn('type', [LedgerEntryType::Payment, LedgerEntryType::Credit, LedgerEntryType::Adjustment, LedgerEntryType::Refund, LedgerEntryType::Writeoff, LedgerEntryType::Reversal])
+                ->whereDate('effective_date', '>=', $cycle->periodStart->toDateString())
+                ->whereDate('effective_date', '<=', today()->toDateString())
+                ->where(fn ($query) => $query->whereNull('invoice_id')->orWhereNotIn('invoice_id', $own->pluck('id')->all()))
+                ->sum('amount_cents');
 
             if ($stored !== null) {
                 $lines = $stored->lineItems->map(fn ($l) => $this->line($l->category, $l->label, $l->description, $l->amount_cents, null, $l->qty_e3, $l->unit_rate_e4))->all();
@@ -74,7 +84,7 @@ class BillingPreviewService
                 propertyId: $a->unit->property_id,
                 accountLabel: $a->billingAccount->account_no ?? "#{$a->billing_account_id}",
                 tenantLabel: $a->billingAccount->payer?->full_name ?? '—',
-                unitLabel: $a->unit->code.($a->bed ? ' '.$a->bed->label : ''),
+                unitLabel: $a->unit->label.($a->bed ? ' '.$a->bed->label : ''),
                 periodStart: $cycle->periodStart->toDateString(),
                 periodEnd: $cycle->periodEnd->toDateString(),
                 issueDate: $cycle->issueDate->toDateString(),
@@ -82,7 +92,8 @@ class BillingPreviewService
                 lines: $lines,
                 currentChargesCents: $current,
                 previousBalanceCents: $previous,
-                estimatedTotalCents: $previous + $current,
+                paymentsSinceCents: $paymentsSince,
+                estimatedTotalCents: $previous + $current + $paymentsSince,
                 status: $stored !== null ? 'already_billed' : ($review ? 'needs_review' : 'eligible'),
                 flags: $flags,
                 invoiceNumber: $stored?->number,
@@ -99,8 +110,8 @@ class BillingPreviewService
 
     /**
      * The one place a bill's lines are assembled: rent, recurring, utilities, one-time. Generation must
-     * call this so what is posted equals what was previewed. A missing rent rate or utility input is a
-     * flag, never a zero line.
+     * call this so what is posted equals what was previewed. A missing rent rate is a blocking flag; a utility
+     * bill not entered yet is shown as a "not yet entered" line and charged on a later bill once entered.
      *
      * @return array{lines: list<array{category: string, label: string, description: ?string, qty_e3: ?int, unit_rate_e4: ?int, amount_cents: int, source: mixed}>, flags: list<string>, needs_review: bool}
      */
@@ -108,6 +119,13 @@ class BillingPreviewService
     {
         $lines = [];
         $flags = [];
+
+        // An opening balance dated in or after this period already counts this month (it was carried over from the
+        // old records), so billing it again would charge the tenant twice. Held for review instead of generated.
+        $coveredUntil = OpeningBalance::where('billing_account_id', $agreement->billing_account_id)->where('status', '!=', 'reversed')->max('as_of');
+        if ($coveredUntil !== null && Carbon::parse($coveredUntil)->toDateString() >= $cycle->periodStart->toDateString()) {
+            $flags[] = 'covered_by_opening_balance:'.Carbon::parse($coveredUntil)->toDateString();
+        }
 
         try {
             $rent = $this->cycles->rentLine($agreement, $cycle);
@@ -127,8 +145,14 @@ class BillingPreviewService
             $lines[] = $this->line('utility', $u['label'], null, $u['amount_cents'], $bill,
                 $metered ? $bill->current_reading_e3 - ($bill->previous_reading_e3 ?? 0) : null, $metered ? $bill->rate_e4 : null);
         }
+        // A utility bill not entered yet does not hold the bill back: the bill shows a "not yet entered" line (₱0.00)
+        // as the indicator, and once the reading/bill is entered it is charged on the tenant's next bill (lateLinesFor).
         foreach ($utility['needs_input'] as $type) {
-            $flags[] = "needs_utility_input:{$type}";
+            $flags[] = "utility_pending:{$type}";
+            $lines[] = $this->line('utility_pending', UtilityAllocationService::TYPES[$type][0].' – not yet entered (will be added to a later bill)', null, 0, null);
+        }
+        foreach ($this->utilities->lateLinesFor($agreement, $cycle) as $u) {
+            $lines[] = $this->line('utility', $u['label'], null, $u['amount_cents'], $u['source']);
         }
         foreach ($utility['no_occupants'] as $type) {
             $flags[] = "no_occupants:{$type}";
@@ -143,7 +167,10 @@ class BillingPreviewService
             }
         }
 
-        return ['lines' => $lines, 'flags' => $flags, 'needs_review' => $flags !== []];
+        // utility_pending is an indicator only; every other flag holds the bill back for review.
+        $blocking = array_filter($flags, fn (string $f) => ! str_starts_with($f, 'utility_pending:'));
+
+        return ['lines' => $lines, 'flags' => $flags, 'needs_review' => $blocking !== []];
     }
 
     /**
@@ -163,7 +190,7 @@ class BillingPreviewService
     }
 
     /** @return Collection<int, RentalAgreement> */
-    public function agreements(int $year, int $month, ?int $propertyId, ?array $agreementIds, ?User $for): Collection
+    public function agreements(int $year, int $month, ?int $propertyId, ?array $agreementIds, ?User $for, ?array $accountIds = null): Collection
     {
         $first = CarbonImmutable::create($year, $month, 1, 0, 0, 0, 'Asia/Manila');
 
@@ -173,6 +200,7 @@ class BillingPreviewService
             ->whereDate('start_date', '<=', $first->addMonthsNoOverflow(2)->toDateString())
             ->where(fn ($q) => $q->whereNull('end_date')->orWhereDate('end_date', '>=', $first->toDateString()))
             ->when($agreementIds !== null, fn ($q) => $q->whereIn('id', $agreementIds))
+            ->when($accountIds !== null, fn ($q) => $q->whereIn('billing_account_id', $accountIds))
             ->whereHas('unit', function ($q) use ($propertyId, $for) {
                 $q->when($propertyId, fn ($q) => $q->where('property_id', $propertyId));
                 if ($for !== null && $for->role === Role::Staff) {
@@ -191,15 +219,18 @@ class BillingPreviewService
             $counts[$r->status]++;
         }
 
-        $new = array_sum(array_map(fn ($r) => $r->currentChargesCents, $rows));
+        $eligible = array_values(array_filter($rows, fn (PreviewRow $row) => $row->status === 'eligible'));
+        $new = array_sum(array_map(fn (PreviewRow $row) => $row->currentChargesCents, $eligible));
         // Rows of one billing account share one balance; count it once.
-        $previous = array_sum(array_column(array_map(fn ($r) => ['a' => $r->accountId, 'p' => $r->previousBalanceCents], $rows), 'p', 'a'));
+        $previous = array_sum(array_column(array_map(fn (PreviewRow $row) => ['a' => $row->accountId, 'p' => $row->previousBalanceCents], $eligible), 'p', 'a'));
+        $payments = array_sum(array_column(array_map(fn (PreviewRow $row) => ['a' => $row->accountId, 'p' => $row->paymentsSinceCents], $eligible), 'p', 'a'));
 
         return [
             'counts' => $counts,
             'total_new_charges_cents' => $new,
             'total_previous_outstanding_cents' => $previous,
-            'estimated_statement_total_cents' => $new + $previous,
+            'total_payments_credits_cents' => $payments,
+            'estimated_statement_total_cents' => $new + $previous + $payments,
         ];
     }
 }

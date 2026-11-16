@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SearchSelect } from '@/components/ui/search-select';
 import { formatCents, parsePesos } from '@/lib/money';
 import { useForm } from '@inertiajs/react';
 import { FormEventHandler, useEffect } from 'react';
@@ -64,24 +65,16 @@ export function AddRecurringChargeDialog({
                     )}
                     <div className="grid gap-2">
                         <Label htmlFor="rc-category">What is it for?</Label>
-                        <select
+                        <SearchSelect
                             id="rc-category"
-                            className={selectClass}
-                            value={form.data.charge_category_id}
-                            onChange={(e) => {
-                                const id = e.target.value;
+                            value={String(form.data.charge_category_id)}
+                            onChange={(id) => {
                                 const name = categories.find((c) => String(c.id) === id)?.name ?? '';
                                 form.setData((d) => ({ ...d, charge_category_id: id, label: d.label || name }));
                             }}
-                            required
-                        >
-                            <option value="">Choose...</option>
-                            {categories.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                    {c.name}
-                                </option>
-                            ))}
-                        </select>
+                            placeholder="Search charge type…"
+                            options={categories.map((c) => ({ value: String(c.id), label: c.name }))}
+                        />
                         <InputError message={errors.charge_category_id} />
                     </div>
                     <div className="grid gap-2">

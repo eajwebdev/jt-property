@@ -133,21 +133,21 @@ class UtilityAllocationServiceTest extends TestCase
     {
         $unit = $this->unit();
         $agreements = collect([$this->agreement($unit), $this->agreement($unit)]);
-        $unitUtility = $this->config($unit, 'water', 'shared', ['split_method' => 'manual']);
+        $unitUtility = $this->config($unit, 'electricity', 'shared', ['split_method' => 'manual']);
         foreach ($agreements as $i => $a) {
             UtilitySplitShare::create(['unit_utility_id' => $unitUtility->id, 'rental_agreement_id' => $a->id, 'manual_cents' => [70000, 30000][$i]]);
         }
 
         $ok = $this->service->linesFor($agreements[0], $this->cycles($agreements)[$agreements[0]->id]);
-        $this->assertSame(['water'], $ok['needs_input']);
+        $this->assertSame(['electricity'], $ok['needs_input']);
 
-        $this->bill($unit, 'water', ['amount_cents' => 100000]);
+        $this->bill($unit, 'electricity', ['amount_cents' => 100000]);
         $ok = $this->service->linesFor($agreements[0], $this->cycles($agreements)[$agreements[0]->id]);
         $this->assertSame([70000], $ok['lines']->pluck('amount_cents')->all());
 
         UtilityBill::first()->update(['amount_cents' => 100100]);
         $bad = $this->service->linesFor($agreements[0], $this->cycles($agreements)[$agreements[0]->id]);
-        $this->assertSame(['water'], $bad['needs_input']);
+        $this->assertSame(['electricity'], $bad['needs_input']);
         $this->assertCount(0, $bad['lines']);
     }
 
@@ -155,8 +155,8 @@ class UtilityAllocationServiceTest extends TestCase
     {
         $unit = $this->unit();
         $gone = $this->agreement($unit, '2026-01-01', '2026-10-31');
-        $this->config($unit, 'water', 'shared', ['split_method' => 'equal']);
-        $bill = $this->bill($unit, 'water', ['amount_cents' => 100000]);
+        $this->config($unit, 'electricity', 'shared', ['split_method' => 'equal']);
+        $bill = $this->bill($unit, 'electricity', ['amount_cents' => 100000]);
 
         $this->assertSame([], $this->service->allocate($bill, collect([$gone]), $this->cycles(collect([$gone]))));
         $this->assertSame([], $this->service->allocate($bill, collect(), []));
@@ -164,7 +164,7 @@ class UtilityAllocationServiceTest extends TestCase
         $result = $this->service->linesFor($gone, new BillingCycle(
             BillingCycle::day('2026-11-01'), BillingCycle::day('2026-11-30'), BillingCycle::day('2026-10-29'), BillingCycle::day('2026-11-05'),
         ));
-        $this->assertSame(['water'], $result['no_occupants']);
+        $this->assertSame(['electricity'], $result['no_occupants']);
         $this->assertCount(0, $result['lines']);
     }
 
@@ -210,12 +210,12 @@ class UtilityAllocationServiceTest extends TestCase
     {
         $unit = $this->unit();
         $a = $this->agreement($unit);
-        $this->config($unit, 'water', 'fixed', ['fixed_cents' => 25000]);
+        $this->config($unit, 'electricity', 'fixed', ['fixed_cents' => 25000]);
 
         $result = $this->lines($a);
 
         $this->assertSame([25000], $result['lines']->pluck('amount_cents')->all());
-        $this->assertSame('Water – fixed charge', $result['lines']->first()['label']);
+        $this->assertSame('Electricity – fixed charge', $result['lines']->first()['label']);
     }
 
     public function test_metered_with_a_bill_gives_an_allocated_line_with_usage_text(): void
@@ -245,7 +245,8 @@ class UtilityAllocationServiceTest extends TestCase
         $result = $this->lines($a);
 
         $this->assertCount(0, $result['lines']);
-        $this->assertEqualsCanonicalizing(['electricity', 'water'], $result['needs_input']);
+        // Water is free: configured or not, it never asks for input and never makes a line.
+        $this->assertSame(['electricity'], $result['needs_input']);
     }
 
     public function test_an_exclusion_suppresses_both_the_line_and_the_flag(): void
@@ -277,12 +278,28 @@ class UtilityAllocationServiceTest extends TestCase
         $a = $this->agreement($unit);
         $b = $this->agreement($unit);
         $c = $this->agreement($unit);
-        $this->config($unit, 'water', 'shared', ['split_method' => 'equal']);
-        $this->bill($unit, 'water', ['amount_cents' => 100000]);
+        $this->config($unit, 'electricity', 'shared', ['split_method' => 'equal']);
+        $this->bill($unit, 'electricity', ['amount_cents' => 100000]);
 
         $amounts = collect([$a, $b, $c])->map(fn ($x) => $this->lines($x)['lines']->first()['amount_cents'])->all();
 
         $this->assertSame([33334, 33333, 33333], $amounts);
-        $this->assertSame('Water – shared bill ₱1,000.00 (your share)', $this->lines($a)['lines']->first()['label']);
+        $this->assertSame('Electricity – shared bill ₱1,000.00 (your share)', $this->lines($a)['lines']->first()['label']);
+    }
+
+    public function test_water_is_free_and_never_billed_in_any_mode(): void
+    {
+        foreach (['fixed' => ['fixed_cents' => 15000], 'shared' => ['split_method' => 'equal'], 'metered' => ['rate_e4' => 115432]] as $mode => $extra) {
+            $unit = $this->unit(RentMode::Whole);
+            $a = $this->agreement($unit);
+            $this->config($unit, 'water', $mode, $extra);
+            $this->bill($unit, 'water', ['amount_cents' => 100000]);
+
+            $result = $this->lines($a);
+
+            $this->assertCount(0, $result['lines'], $mode);
+            $this->assertSame([], $result['needs_input'], $mode);
+            $this->assertSame([], $result['no_occupants'], $mode);
+        }
     }
 }

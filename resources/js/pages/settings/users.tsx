@@ -1,12 +1,21 @@
-import InputError from '@/components/input-error';
 import HeadingSmall from '@/components/heading-small';
+import InputError from '@/components/input-error';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchSelect } from '@/components/ui/search-select';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
@@ -41,7 +50,7 @@ function UserActions({ user, isSelf }: { user: ListedUser; isSelf: boolean }) {
     }
 
     if (isSelf) {
-        return <span className="text-xs text-muted-foreground">You</span>;
+        return <span className="text-muted-foreground text-xs">You</span>;
     }
 
     return (
@@ -79,17 +88,18 @@ function RoleCell({ user, isSelf }: { user: ListedUser; isSelf: boolean }) {
 
     return (
         <div className="grid gap-1">
-            <Select value={user.role} onValueChange={(role) => setPending(role as Role)} disabled={isSelf}>
-                <SelectTrigger className="h-8 w-32" aria-label={`Role for ${user.name}`}>
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="owner">Owner</SelectItem>
-                    <SelectItem value="staff">Staff</SelectItem>
-                    <SelectItem value="accountant">Accountant</SelectItem>
-                </SelectContent>
-            </Select>
-            {isSelf && <p className="text-xs text-muted-foreground">Ask another owner to change your role.</p>}
+            <SearchSelect
+                className="w-32"
+                aria-label={`Role for ${user.name}`}
+                value={user.role}
+                onChange={(role) => setPending(role as Role)}
+                disabled={isSelf}
+                options={[
+                    { value: 'owner', label: 'Owner' },
+                    { value: 'staff', label: 'Staff' },
+                ]}
+            />
+            {isSelf && <p className="text-muted-foreground text-xs">Ask another owner to change your role.</p>}
             <Dialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
                 <DialogContent>
                     <DialogHeader>
@@ -147,15 +157,25 @@ export default function Users({ users }: { users: ListedUser[] }) {
                         </Alert>
                     )}
 
-                    <div className="overflow-x-auto rounded-lg border">
+                    <div className="surface overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead className="bg-muted/50 text-left">
                                 <tr>
-                                    <th scope="col" className="px-3 py-2 font-medium">Name</th>
-                                    <th scope="col" className="px-3 py-2 font-medium">Email</th>
-                                    <th scope="col" className="px-3 py-2 font-medium">Role</th>
-                                    <th scope="col" className="px-3 py-2 font-medium">Status</th>
-                                    <th scope="col" className="px-3 py-2 font-medium"><span className="sr-only">Actions</span></th>
+                                    <th scope="col" className="px-3 py-2 font-medium">
+                                        Name
+                                    </th>
+                                    <th scope="col" className="px-3 py-2 font-medium">
+                                        Email
+                                    </th>
+                                    <th scope="col" className="px-3 py-2 font-medium">
+                                        Role
+                                    </th>
+                                    <th scope="col" className="px-3 py-2 font-medium">
+                                        Status
+                                    </th>
+                                    <th scope="col" className="px-3 py-2 font-medium">
+                                        <span className="sr-only">Actions</span>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -170,7 +190,7 @@ export default function Users({ users }: { users: ListedUser[] }) {
                                             {user.deactivated_at ? (
                                                 <Badge variant="secondary">Deactivated</Badge>
                                             ) : (
-                                                <Badge className="border-transparent bg-success text-success-foreground">Active</Badge>
+                                                <Badge className="bg-success text-success-foreground border-transparent">Active</Badge>
                                             )}
                                         </td>
                                         <td className="px-3 py-2 text-right">
@@ -194,23 +214,30 @@ export default function Users({ users }: { users: ListedUser[] }) {
 
                     <div className="grid gap-2">
                         <Label htmlFor="email">Email address</Label>
-                        <Input id="email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} autoComplete="off" required />
+                        <Input
+                            id="email"
+                            type="email"
+                            value={data.email}
+                            onChange={(e) => setData('email', e.target.value)}
+                            autoComplete="off"
+                            required
+                        />
                         <InputError message={errors.email} />
                     </div>
 
                     <div className="grid gap-2">
                         <Label htmlFor="role">Role</Label>
-                        <Select value={data.role} onValueChange={(value) => setData('role', value as Role)}>
-                            <SelectTrigger id="role" aria-describedby="role-help">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="owner">Owner</SelectItem>
-                                <SelectItem value="staff">Staff</SelectItem>
-                                <SelectItem value="accountant">Accountant</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <p id="role-help" className="text-sm text-muted-foreground">
+                        <SearchSelect
+                            id="role"
+                            aria-describedby="role-help"
+                            value={data.role}
+                            onChange={(value) => setData('role', value as Role)}
+                            options={[
+                                { value: 'owner', label: 'Owner' },
+                                { value: 'staff', label: 'Staff' },
+                            ]}
+                        />
+                        <p id="role-help" className="text-muted-foreground text-sm">
                             {roleHelp[data.role]}
                         </p>
                         <InputError message={errors.role} />
@@ -244,7 +271,7 @@ export default function Users({ users }: { users: ListedUser[] }) {
                     <div className="flex items-center gap-4">
                         <Button disabled={processing}>Add user</Button>
                         {recentlySuccessful && (
-                            <p role="status" className="text-sm text-success">
+                            <p role="status" className="text-success text-sm">
                                 User added
                             </p>
                         )}

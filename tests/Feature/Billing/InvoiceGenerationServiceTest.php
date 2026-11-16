@@ -7,6 +7,7 @@ use App\Enums\InvoiceStatus;
 use App\Enums\LedgerEntryType;
 use App\Enums\RentMode;
 use App\Jobs\GenerateMonthlyBillsJob;
+use App\Models\ActivityLog;
 use App\Models\BillingAccount;
 use App\Models\ChargeCategory;
 use App\Models\Invoice;
@@ -94,7 +95,7 @@ class InvoiceGenerationServiceTest extends TestCase
         return app(ReceivableLedgerService::class)->balance($a->billingAccount);
     }
 
-    public function test_acceptance_invoice_4150_ledger_charge_and_balance_5950(): void
+    public function test_acceptance_invoice_4000_water_free_ledger_charge_and_balance_5800(): void
     {
         $a = $this->agreement(350000, ['due_day' => 12]);
         $this->recurring($a, 'Rice cooker', 20000);
@@ -105,18 +106,18 @@ class InvoiceGenerationServiceTest extends TestCase
         $batch = $this->service->generate(2026, 11, $this->owner);
 
         $invoice = Invoice::sole();
-        $this->assertSame(415000, $invoice->current_charges_cents);
+        $this->assertSame(400000, $invoice->current_charges_cents);
         $this->assertSame(InvoiceStatus::Finalized, $invoice->status);
         $this->assertSame('2026-11-12', $invoice->due_date->toDateString());
         $this->assertSame($this->property->code.'-202611-0001', $invoice->number);
         $this->assertSame("agreement:{$a->id}:cycle:2026-11-01", $invoice->idempotency_key);
-        $this->assertSame(4, $invoice->lineItems()->count());
-        $this->assertSame(415000, (int) $invoice->lineItems()->sum('amount_cents'));
+        $this->assertSame(3, $invoice->lineItems()->count()); // water is free: no line
+        $this->assertSame(400000, (int) $invoice->lineItems()->sum('amount_cents'));
         $charge = LedgerEntry::where('type', LedgerEntryType::Charge)->sole();
-        $this->assertSame(415000, $charge->amount_cents);
+        $this->assertSame(400000, $charge->amount_cents);
         $this->assertSame($invoice->id, $charge->invoice_id);
         $this->assertSame($invoice->issue_date->toDateString(), $charge->effective_date->toDateString());
-        $this->assertSame(595000, $this->balance($a));
+        $this->assertSame(580000, $this->balance($a));
         $this->assertSame(BatchItemStatus::Generated, $batch->items->sole()->status);
         $this->assertSame(1, $batch->counts['generated']);
         $this->assertSame('done', $batch->status);
@@ -488,8 +489,8 @@ class InvoiceGenerationServiceTest extends TestCase
     {
         $a = $this->agreement(350000);
         $b = $this->agreement(350000);
-        $this->utility('water', 'shared', ['split_method' => 'equal']);
-        $bill = UtilityBill::create(['unit_id' => $this->unit->id, 'type' => 'water', 'bill_month' => '2026-11-01', 'base_charge_cents' => 0, 'amount_cents' => 100001, 'status' => 'draft']);
+        $this->utility('electricity', 'shared', ['split_method' => 'equal']);
+        $bill = UtilityBill::create(['unit_id' => $this->unit->id, 'type' => 'electricity', 'bill_month' => '2026-11-01', 'base_charge_cents' => 0, 'amount_cents' => 100001, 'status' => 'draft']);
 
         $this->service->generate(2026, 11, $this->owner, null, [$a->id]);
 
@@ -537,15 +538,15 @@ class InvoiceGenerationServiceTest extends TestCase
     {
         $a = $this->agreement(350000);
         $b = $this->agreement(350000);
-        $this->utility('water', 'shared', ['split_method' => 'equal']);
-        $bill = UtilityBill::create(['unit_id' => $this->unit->id, 'type' => 'water', 'bill_month' => '2026-11-01', 'base_charge_cents' => 0, 'amount_cents' => 100000, 'status' => 'draft']);
+        $this->utility('electricity', 'shared', ['split_method' => 'equal']);
+        $bill = UtilityBill::create(['unit_id' => $this->unit->id, 'type' => 'electricity', 'bill_month' => '2026-11-01', 'base_charge_cents' => 0, 'amount_cents' => 100000, 'status' => 'draft']);
         $this->service->generate(2026, 11, $this->owner);
 
         $this->service->void(Invoice::where('rental_agreement_id', $a->id)->sole(), 'Wrong rent entered', $this->owner);
 
         $this->assertSame('billed', $bill->fresh()->status);
         $this->assertSame(2, UtilityAllocation::where('utility_bill_id', $bill->id)->count());
-        $log = \App\Models\ActivityLog::where('action', 'invoice.voided')->latest('id')->first();
+        $log = ActivityLog::where('action', 'invoice.voided')->latest('id')->first();
         $this->assertStringContainsString('kept billed', json_encode($log->properties));
 
         // Once the sibling is voided too, the bill is freed.

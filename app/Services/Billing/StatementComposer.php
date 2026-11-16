@@ -127,7 +127,7 @@ class StatementComposer
             tenantName: $invoice->billingAccount->payer->full_name,
             propertyName: $invoice->property->name,
             propertyAddress: $invoice->property->address,
-            unitLabel: $unit->code.($bed ? ' / '.$bed->label : ''),
+            unitLabel: $unit->label.($bed ? ' / '.$bed->label : ''),
             lines: $invoice->lineItems->map(fn ($l) => [
                 'category' => $l->category, 'label' => $l->label, 'description' => $l->description,
                 'qty_e3' => $l->qty_e3, 'unit_rate_e4' => $l->unit_rate_e4, 'amount_cents' => $l->amount_cents,

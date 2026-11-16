@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\User;
 use App\Support\Audit;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
@@ -204,6 +205,41 @@ class PaymentService
     public function openDebits(array $accountIds): Collection
     {
         return $this->debitQuery($accountIds)->get()
+            ->each(function (LedgerEntry $e) {
+                $e->remaining_cents = (int) $e->remaining_cents;
+                $e->due_date = $e->due_date ?? $e->effective_date->toDateString();
+            })
+            ->filter(fn (LedgerEntry $e) => $e->remaining_cents > 0)
+            ->values();
+    }
+
+    /**
+     * Debts as they stood at the end of $asOf (for reports "as of" a past date): only charges dated on or before it,
+     * less payments paid on or before it, write-offs dated on or before it; reversals dated later are ignored.
+     * Read-only; payment allocation keeps using openDebits().
+     *
+     * @param  list<int>  $accountIds
+     * @return Collection<int, LedgerEntry>
+     */
+    public function openDebitsAsOf(array $accountIds, CarbonInterface $asOf): Collection
+    {
+        $date = $asOf->toDateString();
+        $writtenOff = '(SELECT -SUM(w.amount_cents) FROM ledger_entries w WHERE w.type = ? AND w.source_type = ? AND w.source_id = ledger_entries.id AND w.effective_date <= ?'
+            .' AND NOT EXISTS (SELECT 1 FROM ledger_entries r WHERE r.reverses_id = w.id AND r.effective_date <= ?))';
+        $allocated = '(SELECT SUM(pa.amount_cents) FROM payment_allocations pa JOIN payments p ON p.id = pa.payment_id'
+            .' WHERE pa.ledger_entry_id = ledger_entries.id AND p.paid_on <= ? AND (pa.reversed_at IS NULL OR DATE(pa.reversed_at) > ?))';
+
+        return LedgerEntry::query()
+            ->leftJoin('invoices', 'invoices.id', '=', 'ledger_entries.invoice_id')
+            ->whereIn('ledger_entries.billing_account_id', $accountIds)
+            ->whereIn('ledger_entries.type', [LedgerEntryType::Charge->value, LedgerEntryType::Opening->value])
+            ->where('ledger_entries.amount_cents', '>', 0)
+            ->where('ledger_entries.effective_date', '<=', $date)
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('ledger_entries as rev')->whereColumn('rev.reverses_id', 'ledger_entries.id')->where('rev.effective_date', '<=', $date))
+            ->select('ledger_entries.*', 'invoices.due_date as due_date')
+            ->selectRaw("ledger_entries.amount_cents - COALESCE({$allocated}, 0) - COALESCE({$writtenOff}, 0) as remaining_cents", [$date, $date, LedgerEntryType::Writeoff->value, (new LedgerEntry)->getMorphClass(), $date, $date])
+            ->orderBy('ledger_entries.effective_date')->orderBy('ledger_entries.id')
+            ->get()
             ->each(function (LedgerEntry $e) {
                 $e->remaining_cents = (int) $e->remaining_cents;
                 $e->due_date = $e->due_date ?? $e->effective_date->toDateString();

@@ -92,8 +92,12 @@ class UserManagementTest extends TestCase
 
     public function test_invalid_role_is_rejected(): void
     {
-        $this->actingAs(User::factory()->owner()->create())
+        $owner = User::factory()->owner()->create();
+        $this->actingAs($owner)
             ->post('/settings/users', $this->payload(['role' => 'superadmin']))
+            ->assertSessionHasErrors('role');
+
+        $this->post('/settings/users', $this->payload(['role' => 'accountant']))
             ->assertSessionHasErrors('role');
 
         $this->assertDatabaseMissing('users', ['email' => 'new.staff@jt.test']);
@@ -103,21 +107,35 @@ class UserManagementTest extends TestCase
     {
         $this->seed();
 
-        $this->post('/login', ['email' => 'owner@jt.test', 'password' => config('app.seed_password')]);
+        $this->post('/login', ['email' => User::where('role', 'owner')->orderBy('id')->value('email'), 'password' => config('app.seed_password') ?: 'password']);
 
         $this->assertAuthenticated();
         $this->assertTrue(auth()->user()->isOwner());
     }
 
-    public function test_seeding_twice_does_not_change_existing_account(): void
+    public function test_seeded_staff_can_log_in_and_only_two_demo_accounts_exist(): void
     {
         $this->seed();
-        User::where('email', 'owner@jt.test')->first()->forceFill(['password' => 'Changed-Pass-1', 'role' => Role::Staff])->save();
+
+        $this->assertDatabaseCount('users', 2);
+        $this->assertDatabaseMissing('users', ['email' => 'accountant@jt.test']);
+        $this->post('/login', ['email' => User::where('role', 'staff')->orderBy('id')->value('email'), 'password' => config('app.seed_password') ?: 'password']);
+
+        $this->assertAuthenticatedAs(User::where('role', 'staff')->orderBy('id')->firstOrFail());
+        $this->get('/dashboard')->assertOk();
+    }
+
+    public function test_reseeding_restores_demo_password_without_changing_role(): void
+    {
+        $this->seed();
+        // The seeded owner, remembered by id: this test changes its role, so it cannot be found by role afterwards.
+        $id = User::where('role', 'owner')->orderBy('id')->value('id');
+        User::findOrFail($id)->forceFill(['password' => 'Changed-Pass-1', 'role' => Role::Staff])->save();
 
         $this->seed();
 
-        $owner = User::where('email', 'owner@jt.test')->first();
-        $this->assertTrue(Hash::check('Changed-Pass-1', $owner->password));
+        $owner = User::findOrFail($id);
+        $this->assertTrue(Hash::check(config('app.seed_password') ?: 'password', $owner->password));
         $this->assertSame(Role::Staff, $owner->role);
     }
 
@@ -148,13 +166,25 @@ class UserManagementTest extends TestCase
         $staff = User::factory()->create();
 
         $this->actingAs($owner)
-            ->patch("/settings/users/{$staff->id}", ['name' => 'Renamed', 'role' => 'accountant'])
+            ->patch("/settings/users/{$staff->id}", ['name' => 'Renamed', 'role' => 'owner'])
             ->assertSessionHasNoErrors()
             ->assertRedirect();
 
         $staff->refresh();
         $this->assertSame('Renamed', $staff->name);
-        $this->assertSame(Role::Accountant, $staff->role);
+        $this->assertSame(Role::Owner, $staff->role);
+    }
+
+    public function test_owner_cannot_assign_accountant_role_to_existing_user(): void
+    {
+        $owner = User::factory()->owner()->create();
+        $staff = User::factory()->create();
+
+        $this->actingAs($owner)
+            ->patch("/settings/users/{$staff->id}", ['name' => $staff->name, 'role' => 'accountant'])
+            ->assertSessionHasErrors('role');
+
+        $this->assertSame(Role::Staff, $staff->fresh()->role);
     }
 
     public function test_last_owner_cannot_be_demoted(): void

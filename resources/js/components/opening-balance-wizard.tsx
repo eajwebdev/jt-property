@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SearchSelect } from '@/components/ui/search-select';
 import { formatCents, parsePesos } from '@/lib/money';
 import { useForm } from '@inertiajs/react';
 import { Plus, TriangleAlert, X } from 'lucide-react';
@@ -18,7 +19,14 @@ export interface WizardAccount {
     account_status: string;
 }
 
-type Line = { month: string; amount: string; note: string };
+type Line = { month: string; category: 'rent' | 'electric' | 'other'; amount: string; note: string };
+
+// The Statement of Accounts column each line lands in: BH (Monthly Due), EB (Actual Electric Consumption) or Others.
+const CATEGORIES: { value: Line['category']; label: string }[] = [
+    { value: 'rent', label: 'BH (rent)' },
+    { value: 'electric', label: 'EB (electric)' },
+    { value: 'other', label: 'Other' },
+];
 
 const STEPS = ['Amount & date', 'Monthly breakdown', 'Review'];
 
@@ -108,16 +116,27 @@ export function OpeningBalanceWizard({ account, today, onClose }: { account: Wiz
                 {step === 1 && (
                     <div className="space-y-3">
                         <p className="text-muted-foreground text-sm">
-                            Optional. List which months make up the debt. The monthly amounts must add up to{' '}
-                            {cents ? formatCents(cents) : 'the total'}.
+                            Optional, but recommended. Enter each unpaid month like the paper Statement of Accounts: one line per month and type (BH
+                            rent or EB electric). The lines must add up to {cents ? formatCents(cents) : 'the total'}.
                         </p>
                         {lines.map((l, i) => (
-                            <div key={i} className="grid grid-cols-[9rem_1fr_1fr_auto] items-end gap-2">
+                            <div key={i} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[9rem_8.5rem_1fr_1fr_auto]">
                                 <div className="grid gap-1">
                                     <Label htmlFor={`ob-m-${i}`} className="text-xs">
                                         Month
                                     </Label>
                                     <Input id={`ob-m-${i}`} type="month" value={l.month} onChange={(e) => setLine(i, { month: e.target.value })} />
+                                </div>
+                                <div className="grid gap-1">
+                                    <Label htmlFor={`ob-c-${i}`} className="text-xs">
+                                        Type
+                                    </Label>
+                                    <SearchSelect
+                                        id={`ob-c-${i}`}
+                                        value={l.category}
+                                        onChange={(v) => setLine(i, { category: v as Line['category'] })}
+                                        options={CATEGORIES.map((c) => ({ value: c.value, label: c.label }))}
+                                    />
                                 </div>
                                 <div className="grid gap-1">
                                     <Label htmlFor={`ob-a-${i}`} className="text-xs">
@@ -151,9 +170,14 @@ export function OpeningBalanceWizard({ account, today, onClose }: { account: Wiz
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => setLines((ls) => [...ls, { month: '', amount: '', note: '' }])}
+                            onClick={() =>
+                                setLines((ls) => [
+                                    ...ls,
+                                    { month: ls.at(-1)?.month ?? '', category: ls.at(-1)?.category ?? 'rent', amount: '', note: '' },
+                                ])
+                            }
                         >
-                            <Plus /> Add a month
+                            <Plus /> Add a line
                         </Button>
                         {lines.length > 0 && (
                             <p className={breakdownOk ? 'text-sm text-green-700 dark:text-green-400' : 'text-destructive text-sm'}>

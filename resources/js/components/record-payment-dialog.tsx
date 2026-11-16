@@ -1,9 +1,9 @@
 import InputError from '@/components/input-error';
-import { selectClass } from '@/components/recurring-charge-dialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SearchSelect } from '@/components/ui/search-select';
 import { formatDate } from '@/lib/tenant-labels';
 import { useForm } from '@inertiajs/react';
 import { FormEventHandler, useEffect, useState } from 'react';
@@ -49,7 +49,15 @@ interface Props {
 
 /** Records a payment. The allocation preview is computed by the server so it always matches what gets saved. */
 export function RecordPaymentDialog({ open, onOpenChange, accounts, initialAccountId, methods, today, isOwner }: Props) {
-    const form = useForm<{ amount: string; paid_on: string; method: string; reference: string; payer_name: string; notes: string; proof: File | null }>({
+    const form = useForm<{
+        amount: string;
+        paid_on: string;
+        method: string;
+        reference: string;
+        payer_name: string;
+        notes: string;
+        proof: File | null;
+    }>({
         amount: '',
         paid_on: today,
         method: 'cash',
@@ -101,36 +109,48 @@ export function RecordPaymentDialog({ open, onOpenChange, accounts, initialAccou
 
                     <div className="grid gap-2">
                         <Label htmlFor="pay-account">Account</Label>
-                        <select id="pay-account" className={selectClass} value={accountId ?? ''} onChange={(e) => setAccountId(Number(e.target.value) || null)} required>
-                            <option value="">Choose a tenant</option>
-                            {accounts.map((a) => (
-                                <option key={a.account_id} value={a.account_id}>
-                                    {a.tenant} ({a.account_no})
-                                </option>
-                            ))}
-                        </select>
+                        <SearchSelect
+                            id="pay-account"
+                            value={String(accountId ?? '')}
+                            onChange={(v) => setAccountId(Number(v) || null)}
+                            placeholder="Search tenant or account no…"
+                            options={accounts.map((a) => ({ value: String(a.account_id), label: a.tenant, hint: a.account_no }))}
+                        />
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="grid gap-2">
                             <Label htmlFor="pay-amount">Amount (pesos)</Label>
-                            <Input id="pay-amount" inputMode="decimal" placeholder="2,500.00" value={form.data.amount} onChange={(e) => form.setData('amount', e.target.value)} required />
+                            <Input
+                                id="pay-amount"
+                                inputMode="decimal"
+                                placeholder="2,500.00"
+                                value={form.data.amount}
+                                onChange={(e) => form.setData('amount', e.target.value)}
+                                required
+                            />
                             <InputError message={errors.amount} />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="pay-date">Date paid</Label>
-                            <Input id="pay-date" type="date" max={today} value={form.data.paid_on} onChange={(e) => form.setData('paid_on', e.target.value)} required />
+                            <Input
+                                id="pay-date"
+                                type="date"
+                                max={today}
+                                value={form.data.paid_on}
+                                onChange={(e) => form.setData('paid_on', e.target.value)}
+                                required
+                            />
                             <InputError message={errors.paid_on} />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="pay-method">Method</Label>
-                            <select id="pay-method" className={selectClass} value={form.data.method} onChange={(e) => form.setData('method', e.target.value)}>
-                                {methods.map((m) => (
-                                    <option key={m} value={m}>
-                                        {methodLabels[m] ?? m}
-                                    </option>
-                                ))}
-                            </select>
+                            <SearchSelect
+                                id="pay-method"
+                                value={form.data.method}
+                                onChange={(v) => form.setData('method', v)}
+                                options={methods.map((m) => ({ value: m, label: methodLabels[m] ?? m }))}
+                            />
                             <InputError message={errors.method} />
                         </div>
                         <div className="grid gap-2">
@@ -146,7 +166,12 @@ export function RecordPaymentDialog({ open, onOpenChange, accounts, initialAccou
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="pay-proof">Proof (photo or PDF, up to 5 MB)</Label>
-                        <Input id="pay-proof" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" onChange={(e) => form.setData('proof', e.target.files?.[0] ?? null)} />
+                        <Input
+                            id="pay-proof"
+                            type="file"
+                            accept=".jpg,.jpeg,.png,.webp,.pdf"
+                            onChange={(e) => form.setData('proof', e.target.files?.[0] ?? null)}
+                        />
                         <InputError message={errors.proof} />
                     </div>
                     <div className="grid gap-2">
@@ -181,7 +206,9 @@ export function RecordPaymentDialog({ open, onOpenChange, accounts, initialAccou
                         <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
-                        <Button disabled={form.processing || !accountId || !form.data.amount.trim()}>{form.processing ? 'Saving...' : 'Save payment'}</Button>
+                        <Button disabled={form.processing || !accountId || !form.data.amount.trim()}>
+                            {form.processing ? 'Saving...' : 'Save payment'}
+                        </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>

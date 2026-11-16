@@ -133,6 +133,7 @@ class StatementPdfTest extends TestCase
 
         $first = $this->actingAs($owner)->get("/invoices/{$invoice->id}/statement.pdf")->assertOk();
         $this->assertSame('application/pdf', $first->headers->get('content-type'));
+        $this->assertStringStartsWith('inline;', $first->headers->get('content-disposition'));
         $sha = StatementSnapshot::first()->sha256;
         $this->pay(100000, '2026-11-12');
 
@@ -174,6 +175,7 @@ class StatementPdfTest extends TestCase
         $this->assertStringNotContainsString('₱4,673.00', $html);
 
         $copy = $this->actingAs($owner)->get("/invoices/{$invoice->id}/statement-copy.pdf")->assertOk();
+        $this->assertStringStartsWith('inline;', $copy->headers->get('content-disposition'));
         $this->assertStringStartsWith('%PDF', $copy->streamedContent());
         $this->assertSame(1, StatementSnapshot::count());
     }

@@ -15,9 +15,9 @@ class DashboardTest extends TestCase
         $this->get('/dashboard')->assertRedirect('/login');
     }
 
-    public function test_home_redirects_to_the_dashboard()
+    public function test_home_is_the_public_landing_page()
     {
-        $this->get('/')->assertRedirect('/dashboard');
+        $this->get('/')->assertOk()->assertInertia(fn ($page) => $page->component('welcome'));
     }
 
     public function test_authenticated_users_can_visit_the_dashboard()

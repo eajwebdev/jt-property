@@ -78,7 +78,7 @@ class DemoSeederTest extends TestCase
     public function test_staff_can_access_riverside_only(): void
     {
         $this->seed(DatabaseSeeder::class);
-        $staff = User::where('email', 'staff@jt.test')->firstOrFail();
+        $staff = User::where('role', 'staff')->orderBy('id')->firstOrFail();
 
         $this->assertTrue($staff->canAccessProperty(Property::where('code', 'RIV')->firstOrFail()));
         $this->assertFalse($staff->canAccessProperty(Property::where('code', 'HIL')->firstOrFail()));

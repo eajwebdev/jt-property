@@ -5,12 +5,13 @@ namespace Database\Seeders;
 use App\Enums\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 use RuntimeException;
 
 class DatabaseSeeder extends Seeder
 {
     /**
-     * Seed demo logins (one per role). Existing accounts are never modified.
+     * Seed the owner and staff demo logins.
      */
     public function run(): void
     {
@@ -25,21 +26,28 @@ class DatabaseSeeder extends Seeder
         }
 
         $demo = [
-            ['Owner Demo', 'owner@jt.test', Role::Owner],
-            ['Staff Demo', 'staff@jt.test', Role::Staff],
-            ['Accountant Demo', 'accountant@jt.test', Role::Accountant],
+            ['Owner Demo', 'owner@jt', Role::Owner],
+            ['Staff Demo', 'staff@jt', Role::Staff],
         ];
 
         foreach ($demo as [$name, $email, $role]) {
-            User::firstOrCreate(['email' => $email], [
+            $user = User::firstOrCreate(['email' => $email], [
                 'name' => $name,
                 'role' => $role,
                 'password' => $password,
                 'email_verified_at' => now(),
             ]);
+
+            if (app()->environment('local', 'testing') && ! Hash::check($password, $user->password)) {
+                $user->forceFill(['password' => $password])->save();
+            }
         }
 
-        if (app()->environment('local', 'testing')) {
+        // Local development starts from the real October 2026 Statement of Accounts (Mubarak Boarding House).
+        // Tests keep the small fake demo data they were written against.
+        if (app()->environment('local')) {
+            $this->call(MubarakBoardingHouseSeeder::class);
+        } elseif (app()->environment('testing')) {
             $this->call(DemoSeeder::class);
         }
     }

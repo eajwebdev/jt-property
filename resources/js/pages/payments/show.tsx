@@ -1,5 +1,6 @@
 import { AllocateDialog, type DebitOption } from '@/components/account-money-dialogs';
 import InputError from '@/components/input-error';
+import { PageHeader } from '@/components/page-header';
 import { methodLabels } from '@/components/record-payment-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +12,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/tenant-labels';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { HandCoins, Wallet } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 
 interface Props {
@@ -53,7 +55,9 @@ function ReverseDialog({ id, open, onOpenChange }: { id: number; open: boolean; 
                 <form onSubmit={submit} className="space-y-4">
                     <DialogHeader>
                         <DialogTitle>Reverse this payment</DialogTitle>
-                        <DialogDescription>A reversal is added to the ledger and the charges it covered become unpaid again. The original stays on record.</DialogDescription>
+                        <DialogDescription>
+                            A reversal is added to the ledger and the charges it covered become unpaid again. The original stays on record.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-2">
                         <Label htmlFor="rev-reason">Reason</Label>
@@ -97,14 +101,28 @@ export default function PaymentShow({ payment, allocations, openDebits, canManag
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={payment.ack_number ?? 'Payment'} />
-            <div className="mx-auto max-w-3xl space-y-5 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-semibold">{payment.amount}</h1>
-                        <p className="text-muted-foreground text-sm">{payment.ack_number ? `Acknowledgment ${payment.ack_number} (not a BIR official receipt)` : 'No acknowledgment number until approved'}</p>
-                    </div>
-                    <Badge variant={payment.status === 'approved' ? 'default' : payment.status === 'pending' ? 'secondary' : 'destructive'}>{statusLabels[payment.status]}</Badge>
-                </div>
+            <div className="mx-auto w-full max-w-3xl space-y-6 p-4 md:p-6">
+                <PageHeader
+                    icon={HandCoins}
+                    title={<span className="font-mono">{payment.amount}</span>}
+                    description={
+                        payment.ack_number
+                            ? `Acknowledgment ${payment.ack_number} (not a BIR official receipt)`
+                            : 'No acknowledgment number until approved'
+                    }
+                    actions={
+                        <Badge variant={payment.status === 'approved' ? 'success' : payment.status === 'pending' ? 'warning' : 'danger'}>
+                            {statusLabels[payment.status]}
+                        </Badge>
+                    }
+                />
+                {payment.ack_number && (
+                    <Button asChild variant="outline">
+                        <a href={route('payments.acknowledgment', payment.id)} target="_blank" rel="noopener noreferrer">
+                            View payment acknowledgment PDF
+                        </a>
+                    </Button>
+                )}
 
                 {flash?.success && (
                     <Alert>
@@ -119,8 +137,9 @@ export default function PaymentShow({ payment, allocations, openDebits, canManag
                                 Approve and post
                             </Button>
                         )}
-                        {payment.status === 'approved' && payment.unallocated_cents > 0 && (
-                            <Button className="h-11" onClick={() => setAllocating(true)}>
+                        {/* Only when something is still owed: otherwise the extra is credit for the next bill (automatic). */}
+                        {payment.status === 'approved' && payment.unallocated_cents > 0 && openDebits.length > 0 && (
+                            <Button className="h-11" variant="outline" onClick={() => setAllocating(true)}>
                                 Allocate
                             </Button>
                         )}
@@ -137,7 +156,7 @@ export default function PaymentShow({ payment, allocations, openDebits, canManag
                     </Alert>
                 )}
 
-                <dl className="grid grid-cols-1 gap-x-6 gap-y-3 rounded-lg border p-4 text-sm sm:grid-cols-2">
+                <dl className="surface grid grid-cols-1 gap-x-6 gap-y-3 p-4 text-sm sm:grid-cols-2">
                     {details.map(([k, v]) =>
                         v ? (
                             <div key={k}>
@@ -161,11 +180,16 @@ export default function PaymentShow({ payment, allocations, openDebits, canManag
                 <section aria-label="Allocations" className="space-y-2">
                     <h2 className="font-medium">What this payment covered</h2>
                     {allocations.length === 0 ? (
-                        <p className="text-muted-foreground text-sm">{payment.status === 'pending' ? 'Allocated when approved.' : 'Nothing allocated; the whole amount is credit.'}</p>
+                        <p className="text-muted-foreground text-sm">
+                            {payment.status === 'pending' ? 'Allocated when approved.' : 'Nothing allocated; the whole amount is credit.'}
+                        </p>
                     ) : (
                         <ul className="divide-y rounded-lg border text-sm">
                             {allocations.map((a) => (
-                                <li key={a.id} className={'flex justify-between gap-3 p-3 ' + (a.reversed ? 'text-muted-foreground line-through' : '')}>
+                                <li
+                                    key={a.id}
+                                    className={'flex justify-between gap-3 p-3 ' + (a.reversed ? 'text-muted-foreground line-through' : '')}
+                                >
                                     <span>
                                         {a.label} <span className="text-muted-foreground">{formatDate(a.date)}</span>
                                     </span>
@@ -174,11 +198,25 @@ export default function PaymentShow({ payment, allocations, openDebits, canManag
                             ))}
                         </ul>
                     )}
-                    {payment.status === 'approved' && <p className="text-muted-foreground text-sm">Kept as credit: {payment.unallocated}</p>}
+                    {payment.status === 'approved' && payment.unallocated_cents > 0 && (
+                        <div className="bg-success/10 text-success flex items-start gap-2 rounded-lg p-3 text-sm">
+                            <Wallet className="mt-0.5 size-4 shrink-0" aria-hidden />
+                            <p>
+                                <strong>{payment.unallocated} paid in advance.</strong> It is kept as credit and deducted automatically from the next bill
+                                {openDebits.length > 0 ? ' (or use Allocate to apply it to an unpaid charge now).' : '. Nothing else to do.'}
+                            </p>
+                        </div>
+                    )}
                 </section>
             </div>
             <ReverseDialog id={payment.id} open={reversing} onOpenChange={setReversing} />
-            <AllocateDialog open={allocating} onOpenChange={setAllocating} paymentId={payment.id} unallocated={payment.unallocated} debits={openDebits} />
+            <AllocateDialog
+                open={allocating}
+                onOpenChange={setAllocating}
+                paymentId={payment.id}
+                unallocated={payment.unallocated}
+                debits={openDebits}
+            />
         </AppLayout>
     );
 }

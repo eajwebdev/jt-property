@@ -6,6 +6,7 @@ use App\Models\BillingAccount;
 use App\Models\LedgerEntry;
 use App\Models\Payment;
 use App\Rules\Pesos;
+use App\Services\Billing\PaymentAcknowledgmentService;
 use App\Services\Billing\PaymentService;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
@@ -135,6 +136,16 @@ class PaymentController extends Controller
         abort_if($payment->proof_path === null || ! Storage::disk('local')->exists($payment->proof_path), 404);
 
         return Storage::disk('local')->download($payment->proof_path);
+    }
+
+    public function acknowledgment(Payment $payment, PaymentAcknowledgmentService $documents): StreamedResponse
+    {
+        Gate::authorize('view', $payment);
+        abort_if($payment->ack_number === null, 404);
+
+        $bytes = $documents->pdf($payment);
+
+        return response()->streamDownload(fn () => print ($bytes), $payment->ack_number.'.pdf', ['Content-Type' => 'application/pdf'], 'inline');
     }
 
     public function approve(Payment $payment): RedirectResponse

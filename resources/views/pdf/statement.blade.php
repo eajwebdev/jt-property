@@ -107,7 +107,7 @@
     .void-note { background: #FBEAE9; color: var(--danger); border: 1px solid var(--danger); border-radius: 2mm; padding: 2mm 4mm; margin-bottom: 4mm; font-weight: 600; break-inside: avoid; }
 
     .toolbar { position: sticky; top: 0; z-index: 10; background: var(--navy); color: #fff; padding: 2.5mm 6mm; display: flex; justify-content: space-between; align-items: center; font-size: 10pt; }
-    .toolbar a { color: #fff; background: var(--teal); padding: 1.6mm 4mm; border-radius: 1.5mm; text-decoration: none; font-weight: 600; }
+    .toolbar a, .toolbar button { color: #fff; background: var(--teal); padding: 1.6mm 4mm; border: 0; border-radius: 1.5mm; text-decoration: none; font: inherit; font-weight: 600; cursor: pointer; }
     @media print { .toolbar { display: none; } }
     @media screen { body { background: #e9eef4; } .sheet { background: #fff; margin-top: 6mm; margin-bottom: 6mm; box-shadow: 0 1px 8px rgba(6, 69, 120, .2); } }
     @media screen and (max-width: 215mm) { .sheet { width: 100%; padding: 0 5mm; } .head { margin: 0 -5mm 4mm; } .head .title { width: 60%; padding-right: 5mm; } }
@@ -118,7 +118,7 @@
 @if ($preview)
     <div class="toolbar">
         <span>Preview – this is not sent to anyone</span>
-        <a href="{{ route('invoices.statement.pdf', $s->invoiceId) }}">Download PDF</a>
+        <span><button type="button" onclick="window.print()">Print</button> <a href="{{ route('invoices.statement.pdf', $s->invoiceId) }}">Download PDF</a></span>
     </div>
 @endif
 @if ($s->isVoid)

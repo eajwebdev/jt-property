@@ -58,7 +58,7 @@ return [
         'node_binary' => env('LARAVEL_PDF_NODE_BINARY'),
         'npm_binary' => env('LARAVEL_PDF_NPM_BINARY'),
         'include_path' => env('LARAVEL_PDF_INCLUDE_PATH'),
-        'chrome_path' => env('PDF_CHROME_PATH', file_exists('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe') ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' : null),
+        'chrome_path' => env('PDF_CHROME_PATH') ?: (file_exists('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe') ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' : null),
         'node_modules_path' => env('LARAVEL_PDF_NODE_MODULES_PATH', base_path('node_modules')),
         'bin_path' => env('LARAVEL_PDF_BIN_PATH'),
         'temp_path' => env('LARAVEL_PDF_TEMP_PATH'),

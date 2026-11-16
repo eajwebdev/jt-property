@@ -20,7 +20,7 @@ class UpdateUserRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'role' => ['required', Rule::enum(Role::class)],
+            'role' => ['required', Rule::in([Role::Owner->value, Role::Staff->value])],
         ];
     }
 }

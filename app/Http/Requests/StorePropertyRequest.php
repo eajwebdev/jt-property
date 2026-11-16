@@ -32,8 +32,12 @@ class StorePropertyRequest extends FormRequest
             'code' => ['required', 'regex:/^[A-Z0-9]{2,10}$/', 'unique:properties,code'],
             'type' => ['required', Rule::enum(PropertyType::class)],
             'address' => ['required', 'string', 'max:1000'],
+            'dti_registration_no' => ['nullable', 'string', 'max:100'],
+            'business_permit_no' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:5000'],
             'amenities' => ['nullable', 'string', 'max:5000'],
+            'auto_send_email' => ['sometimes', 'boolean'],
+            'show_on_website' => ['sometimes', 'boolean'],
             'staff_ids' => ['sometimes', 'array'],
             'staff_ids.*' => ['integer', Rule::exists('users', 'id')->where('role', Role::Staff->value)],
         ];

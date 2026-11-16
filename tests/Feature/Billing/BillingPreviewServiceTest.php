@@ -24,6 +24,7 @@ use App\Services\Billing\BillingCycleResolver;
 use App\Services\Billing\BillingPreviewService;
 use App\Services\Billing\PreviewRow;
 use App\Services\Billing\ReceivableLedgerService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -108,7 +109,7 @@ class BillingPreviewServiceTest extends TestCase
         $this->assertSame(1700000, $preview['summary']['total_new_charges_cents']);
     }
 
-    public function test_acceptance_row_shows_current_4150_previous_1800_estimated_5950(): void
+    public function test_acceptance_row_water_free_current_4000_previous_1800_estimated_5800(): void
     {
         $a = $this->agreement(350000);
         RecurringCharge::create(['rental_agreement_id' => $a->id, 'charge_category_id' => ChargeCategory::where('name', 'Rice cooker')->value('id'), 'label' => 'Rice cooker', 'amount_cents' => 20000, 'start_date' => '2026-01-01']);
@@ -118,10 +119,27 @@ class BillingPreviewServiceTest extends TestCase
 
         $row = $this->row($this->service->preview(2026, 11), $a);
 
-        $this->assertSame(415000, $row->currentChargesCents);
+        $this->assertSame(400000, $row->currentChargesCents);
         $this->assertSame(180000, $row->previousBalanceCents);
-        $this->assertSame(595000, $row->estimatedTotalCents);
-        $this->assertSame(['rent', 'recurring', 'utility', 'utility'], array_column($row->lines, 'category'));
+        $this->assertSame(580000, $row->estimatedTotalCents);
+        $this->assertSame(['rent', 'recurring', 'utility'], array_column($row->lines, 'category')); // water is free: no line
+    }
+
+    public function test_preview_subtracts_current_cycle_payment_once(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-16', 'Asia/Manila'));
+        $agreement = $this->agreement(350000);
+        $ledger = app(ReceivableLedgerService::class);
+        $ledger->post($agreement->billingAccount, LedgerEntryType::Opening, 180000, Carbon::parse('2026-10-01'), $agreement);
+        $ledger->post($agreement->billingAccount, LedgerEntryType::Payment, -50000, Carbon::parse('2026-11-10'), $agreement);
+
+        $preview = $this->service->preview(2026, 11);
+        $row = $this->row($preview, $agreement);
+
+        $this->assertSame(180000, $row->previousBalanceCents);
+        $this->assertSame(-50000, $row->paymentsSinceCents);
+        $this->assertSame(480000, $row->estimatedTotalCents);
+        $this->assertSame(480000, $preview['summary']['estimated_statement_total_cents']);
     }
 
     public function test_tenant_without_email_is_flagged_but_eligible(): void
@@ -134,28 +152,31 @@ class BillingPreviewServiceTest extends TestCase
         $this->assertContains('no_email', $row->flags);
     }
 
-    public function test_missing_water_bill_needs_review_with_reason(): void
+    public function test_missing_electric_bill_does_not_hold_the_bill_and_shows_not_yet_entered(): void
     {
         $a = $this->agreement(350000);
-        $this->utility('water', 'metered');
+        $this->utility('electricity', 'metered');
 
         $row = $this->row($this->service->preview(2026, 11), $a);
 
-        $this->assertSame('needs_review', $row->status);
-        $this->assertContains('needs_utility_input:water', $row->flags);
+        $this->assertSame('eligible', $row->status);
+        $this->assertContains('utility_pending:electricity', $row->flags);
         $this->assertSame(350000, $row->currentChargesCents);
+        $pending = collect($row->lines)->firstWhere('category', 'utility_pending');
+        $this->assertSame(0, $pending['amount_cents']);
+        $this->assertStringContainsString('not yet entered', $pending['label']);
     }
 
     public function test_exclusion_clears_the_utility_review_flag(): void
     {
         $a = $this->agreement(350000);
-        $this->utility('water', 'metered');
-        UtilityExclusion::create(['rental_agreement_id' => $a->id, 'type' => 'water', 'bill_month' => '2026-11-01', 'reason' => 'Away']);
+        $this->utility('electricity', 'metered');
+        UtilityExclusion::create(['rental_agreement_id' => $a->id, 'type' => 'electricity', 'bill_month' => '2026-11-01', 'reason' => 'Away']);
 
         $row = $this->row($this->service->preview(2026, 11), $a);
 
         $this->assertSame('eligible', $row->status);
-        $this->assertNotContains('needs_utility_input:water', $row->flags);
+        $this->assertNotContains('utility_pending:electricity', $row->flags);
     }
 
     public function test_existing_finalized_invoice_is_already_billed(): void

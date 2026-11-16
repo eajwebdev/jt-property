@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchSelect } from '@/components/ui/search-select';
 import { formatCents, parsePesos } from '@/lib/money';
 import { formatDate } from '@/lib/tenant-labels';
 import { useForm } from '@inertiajs/react';
@@ -173,19 +173,17 @@ export default function StartRentalDialog({ tenantId, tenantName, options, open,
                         <>
                             <div className="grid gap-2">
                                 <Label htmlFor="rental-unit">Room</Label>
-                                <Select value={data.unit_id} onValueChange={(v) => setData((d) => ({ ...d, unit_id: v, bed_id: '' }))}>
-                                    <SelectTrigger id="rental-unit">
-                                        <SelectValue placeholder="Choose a room" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {options.units.map((u) => (
-                                            <SelectItem key={u.id} value={String(u.id)}>
-                                                {u.code} - {u.rent_mode === 'whole' ? 'whole room' : 'by bed'}, {u.occupied} of {u.capacity} people,{' '}
-                                                {statusText[u.status] ?? u.status}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <SearchSelect
+                                    id="rental-unit"
+                                    value={String(data.unit_id)}
+                                    onChange={(v) => setData((d) => ({ ...d, unit_id: v, bed_id: '' }))}
+                                    placeholder="Search room…"
+                                    options={options.units.map((u) => ({
+                                        value: String(u.id),
+                                        label: u.code,
+                                        hint: `${u.rent_mode === 'whole' ? 'whole room' : 'by bed'}, ${u.occupied} of ${u.capacity} people, ${statusText[u.status] ?? u.status}`,
+                                    }))}
+                                />
                                 <InputError message={errors.unit_id} />
                             </div>
 
@@ -195,18 +193,13 @@ export default function StartRentalDialog({ tenantId, tenantName, options, open,
                                     {unit.beds.length === 0 ? (
                                         <p className="text-muted-foreground text-sm">Every bed in this room is taken.</p>
                                     ) : (
-                                        <Select value={data.bed_id} onValueChange={(v) => setData('bed_id', v)}>
-                                            <SelectTrigger id="rental-bed">
-                                                <SelectValue placeholder="Choose a free bed" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {unit.beds.map((b) => (
-                                                    <SelectItem key={b.id} value={String(b.id)}>
-                                                        {b.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <SearchSelect
+                                            id="rental-bed"
+                                            value={String(data.bed_id)}
+                                            onChange={(v) => setData('bed_id', v)}
+                                            placeholder="Choose a free bed"
+                                            options={unit.beds.map((b) => ({ value: String(b.id), label: b.label }))}
+                                        />
                                     )}
                                     <InputError message={serverErrors.bed ?? errors.bed_id} />
                                 </div>

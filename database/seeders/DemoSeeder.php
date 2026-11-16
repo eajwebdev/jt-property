@@ -52,6 +52,8 @@ class DemoSeeder extends Seeder
             'type' => PropertyType::BoardingHouse,
             'address' => '123 Demo Street, Barangay Sample, Demo City, Philippines (fake address)',
             'description' => 'Demo data: boarding house with bed-by-bed rooms.',
+            'amenities' => 'Wifi, Water, Shared kitchen, Laundry area, CCTV',
+            'show_on_website' => true,
         ]);
         $hillside = Property::create([
             'name' => 'Hillside Demo Apartments',
@@ -59,9 +61,11 @@ class DemoSeeder extends Seeder
             'type' => PropertyType::Apartment,
             'address' => '45 Sample Road, Demo Heights, Demo City, Philippines (fake address)',
             'description' => 'Demo data: apartment units rented as a whole.',
+            'amenities' => 'Water, Parking, Own toilet and bath',
+            'show_on_website' => true,
         ]);
 
-        User::where('email', 'staff@jt.test')->first()?->properties()->syncWithoutDetaching([$riverside->id]);
+        User::where('role', 'staff')->orderBy('id')->first()?->properties()->syncWithoutDetaching([$riverside->id]);
 
         $a101 = $this->unit($riverside, 'A101', 4, RentMode::PerBed);
         $a102 = $this->unit($riverside, 'A102', 2, RentMode::PerBed);

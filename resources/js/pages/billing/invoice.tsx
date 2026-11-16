@@ -1,5 +1,6 @@
 import { BillingTabs, paymentStatusLabels, paymentStatusVariant } from '@/components/billing-tabs';
 import InputError from '@/components/input-error';
+import { PageHeader } from '@/components/page-header';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,8 @@ import AppLayout from '@/layouts/app-layout';
 import { formatCents } from '@/lib/money';
 import { formatDate } from '@/lib/tenant-labels';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { FileText, Receipt } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 
 interface Invoice {
@@ -37,6 +39,8 @@ interface Invoice {
 interface Props {
     invoice: Invoice;
     canVoid: boolean;
+    canEmail: boolean;
+    emailDelivery: { status: string; reason: string | null; sent_at: string | null } | null;
     statementUrl: string | null;
     statementPdfUrl: string | null;
 }
@@ -53,11 +57,18 @@ function VoidDialog({ invoice, open, onOpenChange }: { invoice: Invoice; open: b
                 <form onSubmit={submit} className="space-y-4">
                     <DialogHeader>
                         <DialogTitle>Void bill {invoice.number}?</DialogTitle>
-                        <DialogDescription>The tenant will no longer owe this bill. The bill stays on record, marked as voided. You can then create a corrected one.</DialogDescription>
+                        <DialogDescription>
+                            The tenant will no longer owe this bill. The bill stays on record, marked as voided. You can then create a corrected one.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-1">
                         <Label htmlFor="void-reason">Why is it being voided?</Label>
-                        <Input id="void-reason" value={form.data.reason} onChange={(e) => form.setData('reason', e.target.value)} placeholder="At least 5 letters" />
+                        <Input
+                            id="void-reason"
+                            value={form.data.reason}
+                            onChange={(e) => form.setData('reason', e.target.value)}
+                            placeholder="At least 5 letters"
+                        />
                         <InputError message={form.errors.reason} />
                     </div>
                     <DialogFooter>
@@ -74,7 +85,7 @@ function VoidDialog({ invoice, open, onOpenChange }: { invoice: Invoice; open: b
     );
 }
 
-export default function InvoiceShow({ invoice, canVoid, statementUrl, statementPdfUrl }: Props) {
+export default function InvoiceShow({ invoice, canVoid, canEmail, emailDelivery, statementUrl, statementPdfUrl }: Props) {
     const { flash } = usePage<SharedData>().props;
     const [voiding, setVoiding] = useState(false);
     const breadcrumbs: BreadcrumbItem[] = [
@@ -87,19 +98,53 @@ export default function InvoiceShow({ invoice, canVoid, statementUrl, statementP
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Bill ${invoice.number}`} />
-            <div className="space-y-5 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-semibold">Bill {invoice.number}</h1>
-                        <p className="text-muted-foreground text-sm">
-                            {invoice.tenant} - Room {invoice.unit} - {invoice.property}
-                        </p>
-                    </div>
-                    <Badge variant={paymentStatusVariant[invoice.status]} className="text-sm">
-                        {paymentStatusLabels[invoice.status]}
-                    </Badge>
-                </div>
+            <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6">
+                <PageHeader
+                    icon={Receipt}
+                    title={<span className="font-mono">Bill {invoice.number}</span>}
+                    description={`${invoice.tenant} · ${invoice.unit} · ${invoice.property}`}
+                    actions={
+                        <>
+                            <Badge variant={paymentStatusVariant[invoice.status]} className="text-sm">
+                                {paymentStatusLabels[invoice.status]}
+                            </Badge>
+                            {statementPdfUrl && (
+                                <Button asChild>
+                                    <a href={statementPdfUrl} target="_blank" rel="noopener noreferrer">
+                                        <FileText /> Billing statement (PDF)
+                                    </a>
+                                </Button>
+                            )}
+                            {statementUrl && (
+                                <Button asChild variant="outline">
+                                    <a href={statementUrl}>View statement</a>
+                                </Button>
+                            )}
+                        </>
+                    }
+                />
                 <BillingTabs active="invoices" />
+
+                {canEmail && (
+                    <div className="flex flex-wrap items-center gap-3 text-sm">
+                        <Button
+                            variant="outline"
+                            disabled={emailDelivery?.status === 'queued'}
+                            onClick={() =>
+                                router.post(route('invoices.email', invoice.id), emailDelivery?.status === 'sent' ? { resend: 1 } : {}, {
+                                    preserveScroll: true,
+                                })
+                            }
+                        >
+                            {emailDelivery?.status === 'sent' ? 'Send statement again' : 'Email statement'}
+                        </Button>
+                        <span className="text-muted-foreground">
+                            {emailDelivery
+                                ? `Email ${emailDelivery.status}${emailDelivery.reason ? ` — ${emailDelivery.reason}` : ''}`
+                                : 'Email not sent'}
+                        </span>
+                    </div>
+                )}
 
                 {flash?.success && (
                     <Alert>
@@ -122,14 +167,14 @@ export default function InvoiceShow({ invoice, canVoid, statementUrl, statementP
                         ['Due', formatDate(invoice.due_date)],
                         ['Account', invoice.account_no],
                     ].map(([k, v]) => (
-                        <div key={k} className="rounded-lg border p-3">
+                        <div key={k} className="surface p-3">
                             <dt className="text-muted-foreground text-xs">{k}</dt>
                             <dd className="font-medium">{v}</dd>
                         </div>
                     ))}
                 </dl>
 
-                <div className="overflow-x-auto rounded-lg border">
+                <div className="surface overflow-x-auto">
                     <table className="w-full text-sm">
                         <caption className="sr-only">Charges on this bill</caption>
                         <thead className="bg-muted/50 text-left">
@@ -153,14 +198,20 @@ export default function InvoiceShow({ invoice, canVoid, statementUrl, statementP
                                         {l.description && <span className="text-muted-foreground block text-xs">{l.description}</span>}
                                     </td>
                                     <td className="p-3 whitespace-nowrap">{l.qty && l.rate ? `${l.qty} x ${l.rate}` : (l.qty ?? '')}</td>
-                                    <td className={'p-3 text-right whitespace-nowrap ' + (l.amount_cents < 0 ? 'text-green-700 dark:text-green-400' : '')}>{formatCents(l.amount_cents)}</td>
+                                    <td
+                                        className={
+                                            'p-3 text-right whitespace-nowrap ' + (l.amount_cents < 0 ? 'text-green-700 dark:text-green-400' : '')
+                                        }
+                                    >
+                                        {formatCents(l.amount_cents)}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
 
-                <dl className="ml-auto max-w-md space-y-2 rounded-lg border p-4 text-sm">
+                <dl className="surface ml-auto max-w-md space-y-2 p-4 text-sm">
                     <div className="flex justify-between gap-3">
                         <dt>Current Invoice Total</dt>
                         <dd className="font-semibold">{formatCents(invoice.current_total_cents)}</dd>
@@ -182,16 +233,6 @@ export default function InvoiceShow({ invoice, canVoid, statementUrl, statementP
                 </dl>
 
                 <div className="flex flex-wrap gap-2">
-                    {statementUrl && (
-                        <Button asChild variant="outline" className="h-11">
-                            <a href={statementUrl}>Statement</a>
-                        </Button>
-                    )}
-                    {statementPdfUrl && (
-                        <Button asChild variant="outline" className="h-11">
-                            <a href={statementPdfUrl}>Statement (PDF)</a>
-                        </Button>
-                    )}
                     {canVoid && (
                         <Button variant="destructive" className="h-11" onClick={() => setVoiding(true)}>
                             Void this bill

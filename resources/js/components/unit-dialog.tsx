@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchSelect } from '@/components/ui/search-select';
 import { rentModeLabels } from '@/lib/property-labels';
 import { type UnitRow } from '@/types';
 import { useForm } from '@inertiajs/react';
@@ -58,7 +58,13 @@ export default function UnitDialog({ propertyId, unit, open, onOpenChange }: Pro
 
                     <div className="grid gap-2">
                         <Label htmlFor="unit-code">Room name or number</Label>
-                        <Input id="unit-code" value={data.code} onChange={(e) => setData('code', e.target.value.toUpperCase())} placeholder="A101" required />
+                        <Input
+                            id="unit-code"
+                            value={data.code}
+                            onChange={(e) => setData('code', e.target.value.toUpperCase())}
+                            placeholder="A101"
+                            required
+                        />
                         <InputError message={errors.code} />
                     </div>
 
@@ -93,30 +99,30 @@ export default function UnitDialog({ propertyId, unit, open, onOpenChange }: Pro
 
                     <div className="grid gap-2">
                         <Label htmlFor="unit-mode">How is rent charged?</Label>
-                        <Select value={data.rent_mode} onValueChange={(value) => setData('rent_mode', value)}>
-                            <SelectTrigger id="unit-mode">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="whole">{rentModeLabels.whole}: one rent for the room</SelectItem>
-                                <SelectItem value="per_bed">{rentModeLabels.per_bed}: each bed has its own rent</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <SearchSelect
+                            id="unit-mode"
+                            value={data.rent_mode}
+                            onChange={(value) => setData('rent_mode', value)}
+                            options={[
+                                { value: 'whole', label: rentModeLabels.whole, hint: 'one rent for the room' },
+                                { value: 'per_bed', label: rentModeLabels.per_bed, hint: 'each bed has its own rent' },
+                            ]}
+                        />
                         <InputError message={errors.rent_mode} />
                     </div>
 
                     <div className="grid gap-2">
                         <Label htmlFor="unit-status">Can people move in?</Label>
-                        <Select value={data.status} onValueChange={(value) => setData('status', value)}>
-                            <SelectTrigger id="unit-status">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="available">Yes, open for tenants</SelectItem>
-                                <SelectItem value="maintenance">No, under repair</SelectItem>
-                                <SelectItem value="unavailable">No, not available</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <SearchSelect
+                            id="unit-status"
+                            value={data.status}
+                            onChange={(value) => setData('status', value)}
+                            options={[
+                                { value: 'available', label: 'Yes, open for tenants' },
+                                { value: 'maintenance', label: 'No, under repair' },
+                                { value: 'unavailable', label: 'No, not available' },
+                            ]}
+                        />
                         <InputError message={errors.status} />
                     </div>
 

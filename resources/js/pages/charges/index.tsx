@@ -1,17 +1,19 @@
 import InputError from '@/components/input-error';
-import { AddRecurringChargeDialog, type Category, selectClass } from '@/components/recurring-charge-dialog';
+import { PageHeader } from '@/components/page-header';
+import { AddRecurringChargeDialog, type Category } from '@/components/recurring-charge-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SearchSelect } from '@/components/ui/search-select';
 import AppLayout from '@/layouts/app-layout';
 import { formatCents, parsePesos } from '@/lib/money';
 import { formatDate } from '@/lib/tenant-labels';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
+import { Plus, Receipt, Zap } from 'lucide-react';
 import { FormEventHandler, useEffect, useState } from 'react';
 
 interface Recurring {
@@ -95,18 +97,12 @@ function EditRecurringDialog({
                     </DialogHeader>
                     <div className="grid gap-2">
                         <Label htmlFor="er-category">Category</Label>
-                        <select
+                        <SearchSelect
                             id="er-category"
-                            className={selectClass}
-                            value={form.data.charge_category_id}
-                            onChange={(e) => form.setData('charge_category_id', e.target.value)}
-                        >
-                            {categories.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                    {c.name}
-                                </option>
-                            ))}
-                        </select>
+                            value={String(form.data.charge_category_id)}
+                            onChange={(v) => form.setData('charge_category_id', v)}
+                            options={categories.map((c) => ({ value: String(c.id), label: c.name }))}
+                        />
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="er-label">Name on the bill</Label>
@@ -240,38 +236,27 @@ function OneTimeDialog({
                     </DialogHeader>
                     <div className="grid gap-2">
                         <Label htmlFor="ot-account">Tenant account</Label>
-                        <select
+                        <SearchSelect
                             id="ot-account"
-                            className={selectClass}
-                            value={form.data.billing_account_id}
-                            onChange={(e) => form.setData((d) => ({ ...d, billing_account_id: e.target.value, rental_agreement_id: '' }))}
-                            required
-                        >
-                            <option value="">Choose...</option>
-                            {options.accounts.map((a) => (
-                                <option key={a.id} value={a.id}>
-                                    {a.label}
-                                </option>
-                            ))}
-                        </select>
+                            value={String(form.data.billing_account_id)}
+                            onChange={(v) => form.setData((d) => ({ ...d, billing_account_id: v, rental_agreement_id: '' }))}
+                            placeholder="Search tenant or account…"
+                            options={options.accounts.map((a) => ({ value: String(a.id), label: a.label }))}
+                        />
                         <InputError message={errors.billing_account_id} />
                     </div>
                     {account && account.agreements.length > 0 && (
                         <div className="grid gap-2">
                             <Label htmlFor="ot-agreement">Room (optional)</Label>
-                            <select
+                            <SearchSelect
                                 id="ot-agreement"
-                                className={selectClass}
-                                value={form.data.rental_agreement_id}
-                                onChange={(e) => form.setData('rental_agreement_id', e.target.value)}
-                            >
-                                <option value="">Whole account</option>
-                                {account.agreements.map((g) => (
-                                    <option key={g.id} value={g.id}>
-                                        {g.label}
-                                    </option>
-                                ))}
-                            </select>
+                                value={String(form.data.rental_agreement_id)}
+                                onChange={(v) => form.setData('rental_agreement_id', v)}
+                                options={[
+                                    { value: '', label: 'Whole account' },
+                                    ...account.agreements.map((g) => ({ value: String(g.id), label: g.label })),
+                                ]}
+                            />
                             <InputError message={errors.rental_agreement_id} />
                         </div>
                     )}
@@ -297,20 +282,13 @@ function OneTimeDialog({
                     </fieldset>
                     <div className="grid gap-2">
                         <Label htmlFor="ot-category">Category</Label>
-                        <select
+                        <SearchSelect
                             id="ot-category"
-                            className={selectClass}
-                            value={form.data.charge_category_id}
-                            onChange={(e) => form.setData('charge_category_id', e.target.value)}
-                            required
-                        >
-                            <option value="">Choose...</option>
-                            {categories.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                    {c.name}
-                                </option>
-                            ))}
-                        </select>
+                            value={String(form.data.charge_category_id)}
+                            onChange={(v) => form.setData('charge_category_id', v)}
+                            placeholder="Search charge type…"
+                            options={categories.map((c) => ({ value: String(c.id), label: c.name }))}
+                        />
                         <InputError message={errors.charge_category_id} />
                     </div>
                     <div className="grid gap-2">
@@ -453,13 +431,12 @@ function CategoriesSection({ categories, canManage }: { categories: Category[]; 
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="cat-kind">Type</Label>
-                        <select id="cat-kind" className={selectClass} value={form.data.kind} onChange={(e) => form.setData('kind', e.target.value)}>
-                            {Object.entries(kindLabels).map(([value, label]) => (
-                                <option key={value} value={value}>
-                                    {label}
-                                </option>
-                            ))}
-                        </select>
+                        <SearchSelect
+                            id="cat-kind"
+                            value={form.data.kind}
+                            onChange={(v) => form.setData('kind', v)}
+                            options={Object.entries(kindLabels).map(([value, label]) => ({ value, label }))}
+                        />
                     </div>
                     <Button disabled={form.processing || !form.data.name.trim()}>
                         <Plus /> Add category
@@ -489,14 +466,19 @@ export default function Charges({ recurring, oneTime, categories, canManage, opt
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Charges & Utilities" />
-            <div className="mx-auto w-full max-w-5xl space-y-6 p-4">
-                <div className="space-y-1">
-                    <h1 className="text-2xl font-semibold tracking-tight">Charges &amp; Utilities</h1>
-                    <p className="text-muted-foreground text-sm">Extra fees on top of rent, like a rice cooker, a repair, or a credit.</p>
-                    <Button asChild variant="outline" size="sm">
-                        <Link href={route('utilities.index')}>Water &amp; electricity readings</Link>
-                    </Button>
-                </div>
+            <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-6">
+                <PageHeader
+                    icon={Receipt}
+                    title="Charges & Utilities"
+                    description="Extra fees on top of rent, like a rice cooker, a repair, or a credit."
+                    actions={
+                        <Button asChild variant="outline">
+                            <Link href={route('utilities.index')}>
+                                <Zap /> Electricity readings
+                            </Link>
+                        </Button>
+                    }
+                />
 
                 {flash.success && (
                     <Alert role="status">
@@ -504,13 +486,13 @@ export default function Charges({ recurring, oneTime, categories, canManage, opt
                     </Alert>
                 )}
 
-                <div role="tablist" aria-label="Charges" className="flex flex-wrap gap-2">
+                <div role="tablist" aria-label="Charges" className="bg-muted/60 inline-flex max-w-full flex-wrap gap-1 rounded-xl border p-1">
                     {tabs.map(([key, label]) => (
                         <Button
                             key={key}
                             role="tab"
                             aria-selected={tab === key}
-                            variant={tab === key ? 'default' : 'outline'}
+                            variant={tab === key ? 'default' : 'ghost'}
                             onClick={() => setTab(key)}
                         >
                             {label}
@@ -525,19 +507,13 @@ export default function Charges({ recurring, oneTime, categories, canManage, opt
                             <div className="flex flex-wrap items-end gap-3">
                                 <div className="grid gap-2">
                                     <Label htmlFor="rc-agreement">Add for</Label>
-                                    <select
+                                    <SearchSelect
                                         id="rc-agreement"
-                                        className={selectClass}
-                                        value={agreementId}
-                                        onChange={(e) => setAgreementId(e.target.value)}
-                                    >
-                                        <option value="">Choose a tenant and room...</option>
-                                        {options.agreements.map((a) => (
-                                            <option key={a.id} value={a.id}>
-                                                {a.label}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        value={String(agreementId)}
+                                        onChange={(v) => setAgreementId(v)}
+                                        placeholder="Search tenant or room…"
+                                        options={options.agreements.map((a) => ({ value: String(a.id), label: a.label }))}
+                                    />
                                 </div>
                                 <Button disabled={!agreement} onClick={() => setAddOpen(true)}>
                                     <Plus /> Add recurring charge

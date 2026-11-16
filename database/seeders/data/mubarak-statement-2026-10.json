@@ -1,0 +1,2182 @@
+[
+ {
+  "section": "current",
+  "name": "ACABAL, Praise Rodriguez",
+  "building": "Creekside House",
+  "room": "Room #5",
+  "rate_cents": 70000,
+  "rent_cents": 70000,
+  "electric_cents": 7223,
+  "total_cents": 77223,
+  "no_deposit": false,
+  "remark": "October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 7223,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "ALCAZAR, Tristan Gariando",
+  "building": "BIND House",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 70000,
+  "electric_cents": 6793,
+  "total_cents": 76793,
+  "no_deposit": false,
+  "remark": "October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 6793,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "ALIPO-ON, Erika Dinaguit",
+  "building": "Creekside House",
+  "room": "Room #8",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 21026,
+  "total_cents": 161026,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & May-September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-05",
+    "amount_cents": 21026,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "ALISING, Joemar Giganan",
+  "building": "Jerry's House-Main",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 8426,
+  "total_cents": 148426,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 8426,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "ALYAWAN, Joy Panlaan",
+  "building": "BIND House",
+  "room": "Room #3",
+  "rate_cents": 70000,
+  "rent_cents": 70000,
+  "electric_cents": 6740,
+  "total_cents": 76740,
+  "no_deposit": true,
+  "remark": "October 2026 BH & September 2026 EB accounts (no deposit)",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 6740,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "AMEN, Cherylen Puyogao",
+  "building": "Creekside House",
+  "room": "Room #6",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 10397,
+  "total_cents": 150397,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & July-September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-07",
+    "amount_cents": 10397,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "ANADON, Carla Embalsado",
+  "building": "Creekside House",
+  "room": "Room #5",
+  "rate_cents": 70000,
+  "rent_cents": 70000,
+  "electric_cents": 7223,
+  "total_cents": 77223,
+  "no_deposit": false,
+  "remark": "October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 7223,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "ARLOS, Elysa Jane Sabio",
+  "building": "Main House",
+  "room": "Room #7",
+  "rate_cents": 180000,
+  "rent_cents": 180000,
+  "electric_cents": 30510,
+  "total_cents": 210510,
+  "no_deposit": true,
+  "remark": "October 2026 BH & September 2026 EB accounts (no deposit)",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 180000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 30510,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "BACONGCO, Elyza Jean Lapuhapu",
+  "building": "Main House",
+  "room": "Room #4",
+  "rate_cents": 150000,
+  "rent_cents": 0,
+  "electric_cents": 20307,
+  "total_cents": 20307,
+  "no_deposit": false,
+  "remark": "September 2026 EB account",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 20307,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "BACONGCO, Jirec Alyawan",
+  "building": "Creekside House",
+  "room": "Room #10",
+  "rate_cents": 100000,
+  "rent_cents": 99966,
+  "electric_cents": 0,
+  "total_cents": 99966,
+  "no_deposit": true,
+  "remark": "October 2026 account (no deposit)",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 99966,
+    "category": "rent",
+    "partial": true
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "BACONGCO, Jundil & Trixie Mae Alyawan",
+  "building": "Main House",
+  "room": "Room #5",
+  "rate_cents": 200000,
+  "rent_cents": 287195,
+  "electric_cents": 0,
+  "total_cents": 287195,
+  "no_deposit": true,
+  "remark": "Balance of September + October 2026 BH accounts (no deposit)",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 87195,
+    "category": "rent",
+    "partial": true
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 200000,
+    "category": "rent",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "BAHALA, Precious Belle Caro",
+  "building": "Creekside House",
+  "room": "Room #3",
+  "rate_cents": 70000,
+  "rent_cents": 210000,
+  "electric_cents": 27460,
+  "total_cents": 237460,
+  "no_deposit": false,
+  "remark": "August-October 2026 BH & July-September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-08",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-07",
+    "amount_cents": 27460,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "BLANZA, Michelle Ann D.",
+  "building": "Main House",
+  "room": "Room #3",
+  "rate_cents": 150000,
+  "rent_cents": 300000,
+  "electric_cents": 38375,
+  "total_cents": 338375,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & July-September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 150000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 150000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-07",
+    "amount_cents": 38375,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "BOHOL, Micah Petulan",
+  "building": "Creekside House",
+  "room": "Room #9",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 26838,
+  "total_cents": 166838,
+  "no_deposit": false,
+  "remark": "September-October 206 BH & June-September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-06",
+    "amount_cents": 26838,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "BUENABELES, Jovan Canones",
+  "building": "BIND House",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 70000,
+  "electric_cents": 6793,
+  "total_cents": 76793,
+  "no_deposit": false,
+  "remark": "October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 6793,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "CADAYONA, Ana Rose Rodriguez",
+  "building": "Creekside House",
+  "room": "Room #5",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 7223,
+  "total_cents": 147223,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 7223,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "CADAYONA, Lenlie Cataylo",
+  "building": "Creekside House",
+  "room": "Room #4",
+  "rate_cents": 70000,
+  "rent_cents": 180000,
+  "electric_cents": 5013,
+  "total_cents": 185013,
+  "no_deposit": false,
+  "remark": "Balance of August + September-October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-08",
+    "amount_cents": 40000,
+    "category": "rent",
+    "partial": true
+   },
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 5013,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "CALIDGUID, Shellben Cream Cabual",
+  "building": "Creekside House",
+  "room": "Room #9",
+  "rate_cents": 70000,
+  "rent_cents": 0,
+  "electric_cents": 9598,
+  "total_cents": 9598,
+  "no_deposit": false,
+  "remark": "September 2026 EB account",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 9598,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "CATALAN, Regen Mae Sara",
+  "building": "Creekside House",
+  "room": "Room #7",
+  "rate_cents": 70000,
+  "rent_cents": 70000,
+  "electric_cents": 3954,
+  "total_cents": 73954,
+  "no_deposit": false,
+  "remark": "October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 3954,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "CELIZ, Carl Allen Hechanova",
+  "building": "Jerry's House-Main",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 70000,
+  "electric_cents": 8480,
+  "total_cents": 78480,
+  "no_deposit": false,
+  "remark": "October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 8480,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "CUEVAS, Miah Nanagad",
+  "building": "Creekside House",
+  "room": "Room #3",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 10130,
+  "total_cents": 150130,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 10130,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "DALMACIO, Mary Ann Espinosa",
+  "building": "Creekside House",
+  "room": "Room #8",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 11526,
+  "total_cents": 151526,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & August-September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-08",
+    "amount_cents": 11526,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "DE JOSE, Tomas Librado",
+  "building": "BIND House",
+  "room": "Room #1",
+  "rate_cents": 70000,
+  "rent_cents": 70000,
+  "electric_cents": 15273,
+  "total_cents": 85273,
+  "no_deposit": false,
+  "remark": "October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 15273,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "DINAGUIT, Venz Felim Magbanua",
+  "building": "Jerry's House-Main",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 70000,
+  "electric_cents": 8404,
+  "total_cents": 78404,
+  "no_deposit": false,
+  "remark": "October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 8404,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "DUGADUGA, Cristy Joy Juguan",
+  "building": "Creekside House",
+  "room": "Room #7",
+  "rate_cents": 70000,
+  "rent_cents": 134204,
+  "electric_cents": 3958,
+  "total_cents": 138162,
+  "no_deposit": false,
+  "remark": "Balance of September + October 2026 BH & September 2026 accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 64204,
+    "category": "rent",
+    "partial": true
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 3958,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "EMBARQUE, Adrian Joshua Villanueva",
+  "building": "Jerry's House-Main",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 280000,
+  "electric_cents": 25483,
+  "total_cents": 305483,
+  "no_deposit": false,
+  "remark": "July-October 2026 BH & June-September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-07",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-08",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-06",
+    "amount_cents": 25483,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "EMBIADO, Johndel Alegarbes",
+  "building": "BIND House",
+  "room": "Room #1",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 21849,
+  "total_cents": 161849,
+  "no_deposit": false,
+  "remark": "July-August 2026 BH & June-August 2026 EB accounts (OJT Starting September 2026)",
+  "breakdown": [
+   {
+    "month": "2026-07",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-08",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-08",
+    "from": "2026-06",
+    "amount_cents": 21849,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "FEGIDERO, Arvin Jhon Cervantes",
+  "building": "Jerry's House-Main",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 8504,
+  "total_cents": 148504,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 8504,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "FIXIO, John Brenan Superficial",
+  "building": "BIND House",
+  "room": "Room #3",
+  "rate_cents": 70000,
+  "rent_cents": 210000,
+  "electric_cents": 17940,
+  "total_cents": 227940,
+  "no_deposit": false,
+  "remark": "August-October 2026 BH & July-September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-08",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-07",
+    "amount_cents": 17940,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "FORDENTE, Clarisse Balasabas",
+  "building": "Jerry's House-Annex",
+  "room": "Room #1",
+  "rate_cents": 150000,
+  "rent_cents": 0,
+  "electric_cents": 10187,
+  "total_cents": 10187,
+  "no_deposit": true,
+  "remark": "September 2026 EB account (no deposit)",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 10187,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "GANANCIAL, Christian Rey Taborete",
+  "building": "Jerry's House-Main",
+  "room": "Room #4",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 8902,
+  "total_cents": 148902,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 8902,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "HERRERA, Jose Marie Montecastro",
+  "building": "Jerry's House-Main",
+  "room": "Room #4",
+  "rate_cents": 70000,
+  "rent_cents": 490000,
+  "electric_cents": 36814,
+  "total_cents": 526814,
+  "no_deposit": false,
+  "remark": "April-October 2026 BH & April-September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-04",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-05",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-06",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-07",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-08",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-04",
+    "amount_cents": 36814,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "IGLESIA, Kenny Jay Bolanio",
+  "building": "Jerry's House-Main",
+  "room": "Room #4",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 8904,
+  "total_cents": 148904,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 8904,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "JABAGAT, Gladys Valenzuela",
+  "building": "Creekside House",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 70000,
+  "electric_cents": 9698,
+  "total_cents": 79698,
+  "no_deposit": false,
+  "remark": "October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 9698,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "JABAGAT, Monaliza Valenzuela",
+  "building": "Creekside House",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 70000,
+  "electric_cents": 9698,
+  "total_cents": 79698,
+  "no_deposit": false,
+  "remark": "October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 9698,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "LABRADOR, Rhegene Maria Calidguid",
+  "building": "Creekside House",
+  "room": "Room #9",
+  "rate_cents": 70000,
+  "rent_cents": 0,
+  "electric_cents": 9611,
+  "total_cents": 9611,
+  "no_deposit": false,
+  "remark": "September 2026 EB account",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 9611,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "LIBRADILLA, Shiela Mae Bulagao",
+  "building": "Creekside House",
+  "room": "Room #5",
+  "rate_cents": 70000,
+  "rent_cents": 0,
+  "electric_cents": 7208,
+  "total_cents": 7208,
+  "no_deposit": false,
+  "remark": "September 2026 EB account (BH paid until January 2026)",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 7208,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "MAMAR, Raven Rich Matthew & Razel Canlas",
+  "building": "Main House",
+  "room": "Room #6",
+  "rate_cents": 280000,
+  "rent_cents": 280000,
+  "electric_cents": 4000,
+  "total_cents": 284000,
+  "no_deposit": true,
+  "remark": "October 2026 BH & balance of September 2026 EB accounts (no deposit)",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 280000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 4000,
+    "category": "electric",
+    "partial": true
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "MANGUBAT, Joshua Dadivas",
+  "building": "BIND House",
+  "room": "Room #1",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 23613,
+  "total_cents": 163613,
+  "no_deposit": true,
+  "remark": "September-October 2026 & August-September 2026 EB accounts (no deposit)",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-08",
+    "amount_cents": 23613,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "MARFIL, Ellen Grace Barioga",
+  "building": "Jerry's House-Annex",
+  "room": "Room #2",
+  "rate_cents": 150000,
+  "rent_cents": 300000,
+  "electric_cents": 20285,
+  "total_cents": 320285,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 150000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 150000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 20285,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "MARFIL, Ron Rick Gleen",
+  "building": "BIND House",
+  "room": "Room #1",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 15202,
+  "total_cents": 155202,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 15202,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "MATAVIA, Angel Cubid",
+  "building": "Creekside House",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 25098,
+  "total_cents": 165098,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & July-September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-07",
+    "amount_cents": 25098,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "MATAVIA, Queenie Cubid",
+  "building": "Creekside House",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 25149,
+  "total_cents": 165149,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & July-September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-07",
+    "amount_cents": 25149,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "MONTECLARO, Carisha Ann & Wendel Celiz",
+  "building": "Main House",
+  "room": "Room #1",
+  "rate_cents": 200000,
+  "rent_cents": 400000,
+  "electric_cents": 44132,
+  "total_cents": 444132,
+  "no_deposit": true,
+  "remark": "September-October 2026 BH & September 2026 EB accounts (no deposit)",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 200000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 200000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 44132,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "MUMAR, Trisha Anne Esmerez",
+  "building": "Creekside House",
+  "room": "Room #7",
+  "rate_cents": 70000,
+  "rent_cents": 210000,
+  "electric_cents": 9262,
+  "total_cents": 219262,
+  "no_deposit": false,
+  "remark": "August-October BH & August-September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-08",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-08",
+    "amount_cents": 9262,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "OLPOS, Christylyn Endona",
+  "building": "Creekside House",
+  "room": "Room #3",
+  "rate_cents": 70000,
+  "rent_cents": 70000,
+  "electric_cents": 10160,
+  "total_cents": 80160,
+  "no_deposit": false,
+  "remark": "October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 10160,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "ORENSE, Daryl John Cabayao",
+  "building": "Jerry's House-Main",
+  "room": "Room #3",
+  "rate_cents": 75000,
+  "rent_cents": 75000,
+  "electric_cents": 21520,
+  "total_cents": 96520,
+  "no_deposit": false,
+  "remark": "October 2026 BH & August-September 2026 EB acounts",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 75000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-08",
+    "amount_cents": 21520,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "PALOMAR, Ezekel Susano",
+  "building": "Jerry's House-Main",
+  "room": "Room #4",
+  "rate_cents": 70000,
+  "rent_cents": 70000,
+  "electric_cents": 8902,
+  "total_cents": 78902,
+  "no_deposit": false,
+  "remark": "October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 8902,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "PARREÑO, Luke Andrei Tizon",
+  "building": "Jerry's House-Main",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 70000,
+  "electric_cents": 8404,
+  "total_cents": 78404,
+  "no_deposit": false,
+  "remark": "October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 8404,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "RALO, Eva Antonia Daquiaog",
+  "building": "Creekside House",
+  "room": "Room #8",
+  "rate_cents": 70000,
+  "rent_cents": 210000,
+  "electric_cents": 17425,
+  "total_cents": 227425,
+  "no_deposit": false,
+  "remark": "August-October 2026 BH & July-September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-08",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-07",
+    "amount_cents": 17425,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "RALO, Lhougan Daquiaog",
+  "building": "BIND House",
+  "room": "Room #2",
+  "rate_cents": 0,
+  "rent_cents": 0,
+  "electric_cents": 0,
+  "total_cents": 0,
+  "no_deposit": false,
+  "remark": "(SA starting August 2025)",
+  "breakdown": []
+ },
+ {
+  "section": "current",
+  "name": "SAGARIO, Jumuel Mationg",
+  "building": "BIND House",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 6793,
+  "total_cents": 146793,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 6793,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "SALAN, May Tongoy",
+  "building": "Creekside House",
+  "room": "Room #1",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 101,
+  "total_cents": 140101,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 101,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "SERILLA, Joevani Taberos",
+  "building": "Main House",
+  "room": "Room #10",
+  "rate_cents": 220000,
+  "rent_cents": 1397907,
+  "electric_cents": 9792,
+  "total_cents": 1407699,
+  "no_deposit": true,
+  "remark": "April-September 2026 BH & August 2026 EB (no deposit)",
+  "breakdown": [
+   {
+    "month": "2026-04",
+    "amount_cents": 297907,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-05",
+    "amount_cents": 220000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-06",
+    "amount_cents": 220000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-07",
+    "amount_cents": 220000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-08",
+    "amount_cents": 220000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "amount_cents": 220000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-08",
+    "from": "2026-08",
+    "amount_cents": 9792,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "SHANGCO, Windel Gasapo",
+  "building": "Jerry's House-Main",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 0,
+  "electric_cents": 8480,
+  "total_cents": 8480,
+  "no_deposit": false,
+  "remark": "September 2026 EB account",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 8480,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "TERIO, Mairenaea Abiera",
+  "building": "Main House",
+  "room": "Room #9",
+  "rate_cents": 200000,
+  "rent_cents": 200000,
+  "electric_cents": 20001,
+  "total_cents": 220001,
+  "no_deposit": true,
+  "remark": "October 2026 BH & September 2026 EB accounts (no deposit)",
+  "breakdown": [
+   {
+    "month": "2026-10",
+    "amount_cents": 200000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 20001,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "UBAT, Meynil Soreno",
+  "building": "BIND House",
+  "room": "Room #3",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 6778,
+  "total_cents": 146778,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 6778,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "VILLACAMPA, Joven Rey Cabunson",
+  "building": "Jerry's House-Main",
+  "room": "Room #2",
+  "rate_cents": 70000,
+  "rent_cents": 280000,
+  "electric_cents": 27411,
+  "total_cents": 307411,
+  "no_deposit": false,
+  "remark": "x",
+  "breakdown": [
+   {
+    "month": "2026-07",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-08",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 27411,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "VILLAHERMOSA, Joem Senon",
+  "building": "Jerry's House-Main",
+  "room": "Room #3",
+  "rate_cents": 75000,
+  "rent_cents": 150000,
+  "electric_cents": 32520,
+  "total_cents": 182520,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & July-September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 75000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 75000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-07",
+    "amount_cents": 32520,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "YUNSAL, Jan Roger Planta",
+  "building": "Jerry's House-Main",
+  "room": "Room #1",
+  "rate_cents": 130000,
+  "rent_cents": 395654,
+  "electric_cents": 8480,
+  "total_cents": 404134,
+  "no_deposit": true,
+  "remark": "Balance of July + August-October 2026 BH & September 2026 EB accounts (no deposit)",
+  "breakdown": [
+   {
+    "month": "2026-07",
+    "amount_cents": 5654,
+    "category": "rent",
+    "partial": true
+   },
+   {
+    "month": "2026-08",
+    "amount_cents": 130000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "amount_cents": 130000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 130000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 8480,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "current",
+  "name": "ZAMORA, Kimberly Villaruel",
+  "building": "Creekside House",
+  "room": "Room #6",
+  "rate_cents": 70000,
+  "rent_cents": 140000,
+  "electric_cents": 3379,
+  "total_cents": 143379,
+  "no_deposit": false,
+  "remark": "September-October 2026 BH & September 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-09",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-10",
+    "amount_cents": 70000,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-09",
+    "from": "2026-09",
+    "amount_cents": 3379,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "previous",
+  "name": "ALIPERIO, Jennifer/ RABAGO, NIcole Pahoway",
+  "building": null,
+  "room": null,
+  "rate_cents": 0,
+  "rent_cents": 0,
+  "electric_cents": 30168,
+  "total_cents": 30168,
+  "no_deposit": false,
+  "remark": "March-June 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-06",
+    "from": "2026-03",
+    "amount_cents": 30168,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "previous",
+  "name": "ARABIA, Shantal Salabia",
+  "building": null,
+  "room": null,
+  "rate_cents": 0,
+  "rent_cents": 0,
+  "electric_cents": 26804,
+  "total_cents": 26804,
+  "no_deposit": false,
+  "remark": "May 2026 EB account",
+  "breakdown": [
+   {
+    "month": "2026-05",
+    "from": "2026-05",
+    "amount_cents": 26804,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "previous",
+  "name": "PLABENER, Marlyn Joy Gregorio",
+  "building": null,
+  "room": null,
+  "rate_cents": 0,
+  "rent_cents": 0,
+  "electric_cents": 7179,
+  "total_cents": 7179,
+  "no_deposit": false,
+  "remark": "November-December 2025 electricity account (to stop boarding/OJT)",
+  "breakdown": [
+   {
+    "month": "2025-12",
+    "from": "2025-11",
+    "amount_cents": 7179,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "previous",
+  "name": "SHANGCO, Windel Gasapo",
+  "building": null,
+  "room": null,
+  "rate_cents": 0,
+  "rent_cents": 248166,
+  "electric_cents": 0,
+  "total_cents": 248166,
+  "no_deposit": true,
+  "remark": "Balance of February + March-May 2026 BH accounts (no deposit)",
+  "breakdown": [
+   {
+    "month": "2026-02",
+    "amount_cents": 62043,
+    "category": "rent",
+    "partial": true
+   },
+   {
+    "month": "2026-03",
+    "amount_cents": 62041,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-04",
+    "amount_cents": 62041,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2026-05",
+    "amount_cents": 62041,
+    "category": "rent",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "previous",
+  "name": "SITOJADO, Trisha Marie Pastolero",
+  "building": null,
+  "room": null,
+  "rate_cents": 0,
+  "rent_cents": 37949,
+  "electric_cents": 0,
+  "total_cents": 37949,
+  "no_deposit": false,
+  "remark": "Balance of May 2026 BH account",
+  "breakdown": [
+   {
+    "month": "2026-05",
+    "amount_cents": 37949,
+    "category": "rent",
+    "partial": true
+   }
+  ]
+ },
+ {
+  "section": "previous",
+  "name": "PADURA, Karyll Paula Baxinela",
+  "building": null,
+  "room": null,
+  "rate_cents": 0,
+  "rent_cents": 0,
+  "electric_cents": 6887,
+  "total_cents": 6887,
+  "no_deposit": false,
+  "remark": "May-June 2026 EB accounts",
+  "breakdown": [
+   {
+    "month": "2026-06",
+    "from": "2026-05",
+    "amount_cents": 6887,
+    "category": "electric",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "previous",
+  "name": "GENISE, Larell Genta",
+  "building": null,
+  "room": null,
+  "rate_cents": 0,
+  "rent_cents": 250000,
+  "electric_cents": 0,
+  "total_cents": 250000,
+  "no_deposit": false,
+  "remark": "Balance of October + November-December 2023 & January 2024 accounts",
+  "breakdown": [
+   {
+    "month": "2023-10",
+    "amount_cents": 62500,
+    "category": "rent",
+    "partial": true
+   },
+   {
+    "month": "2023-11",
+    "amount_cents": 62500,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2023-12",
+    "amount_cents": 62500,
+    "category": "rent",
+    "partial": false
+   },
+   {
+    "month": "2024-01",
+    "amount_cents": 62500,
+    "category": "rent",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "previous",
+  "name": "SEVILLA, John Cesar",
+  "building": null,
+  "room": null,
+  "rate_cents": 0,
+  "rent_cents": 40000,
+  "electric_cents": 0,
+  "total_cents": 40000,
+  "no_deposit": false,
+  "remark": "Balance of May + June 2023 accounts (P1,100.00 less deposit)",
+  "breakdown": [
+   {
+    "month": "2023-05",
+    "amount_cents": 20000,
+    "category": "rent",
+    "partial": true
+   },
+   {
+    "month": "2023-06",
+    "amount_cents": 20000,
+    "category": "rent",
+    "partial": false
+   }
+  ]
+ },
+ {
+  "section": "previous",
+  "name": "SUAREZ, Jayson",
+  "building": null,
+  "room": null,
+  "rate_cents": 0,
+  "rent_cents": 30000,
+  "electric_cents": 0,
+  "total_cents": 30000,
+  "no_deposit": false,
+  "remark": "Balance of June 2023 account",
+  "breakdown": [
+   {
+    "month": "2023-06",
+    "amount_cents": 30000,
+    "category": "rent",
+    "partial": true
+   }
+  ]
+ },
+ {
+  "section": "previous",
+  "name": "TALANQUINES, Mat Samuel",
+  "building": null,
+  "room": null,
+  "rate_cents": 0,
+  "rent_cents": 40000,
+  "electric_cents": 0,
+  "total_cents": 40000,
+  "no_deposit": false,
+  "remark": "",
+  "breakdown": [
+   {
+    "month": "2023-06",
+    "amount_cents": 40000,
+    "category": "rent",
+    "partial": true
+   }
+  ]
+ },
+ {
+  "section": "previous",
+  "name": "BALLADOS, Jerry",
+  "building": null,
+  "room": null,
+  "rate_cents": 0,
+  "rent_cents": 0,
+  "electric_cents": 7118,
+  "total_cents": 7118,
+  "no_deposit": false,
+  "remark": "Balance of October + November 2025 electricity accounts",
+  "breakdown": [
+   {
+    "month": "2025-11",
+    "from": "2025-10",
+    "amount_cents": 7118,
+    "category": "electric",
+    "partial": true
+   }
+  ]
+ }
+]

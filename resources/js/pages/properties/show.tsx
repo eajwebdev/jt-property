@@ -1,12 +1,18 @@
+import { EmptyState } from '@/components/empty-state';
+import { PageHeader } from '@/components/page-header';
+import PropertyFormDialog, { type PropertyFormData } from '@/components/property-form-dialog';
+import PropertyPhotos from '@/components/property-photos';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import UnitDialog from '@/components/unit-dialog';
 import UnitStatusBadge from '@/components/unit-status-badge';
+import { useUrlModal } from '@/hooks/use-url-modal';
 import AppLayout from '@/layouts/app-layout';
 import { propertyTypeLabels, rentModeLabels } from '@/lib/property-labels';
-import { type BreadcrumbItem, type PropertyDetail, type SharedData, type UnitRow } from '@/types';
-import { Head, Link, usePage } from '@inertiajs/react';
-import { BedDouble, Pencil, Plus } from 'lucide-react';
+import { type BreadcrumbItem, type PropertyDetail, type PropertyPhoto, type SharedData, type UnitRow } from '@/types';
+import { Head, usePage } from '@inertiajs/react';
+import { BedDouble, Building2, ExternalLink, Globe, MapPin, Pencil, Plus, Users } from 'lucide-react';
 import { useState } from 'react';
 
 interface Props {
@@ -14,6 +20,9 @@ interface Props {
     units: UnitRow[];
     staff: { id: number; name: string }[];
     canManage: boolean;
+    form: PropertyFormData | null;
+    photos: PropertyPhoto[];
+    maxPhotos: number;
 }
 
 function Occupants({ unit }: { unit: UnitRow }) {
@@ -32,7 +41,8 @@ function Occupants({ unit }: { unit: UnitRow }) {
 
 const place = (unit: UnitRow) => [unit.building, unit.floor && `Floor ${unit.floor}`].filter(Boolean).join(', ') || '-';
 
-export default function Show({ property, units, staff, canManage }: Props) {
+export default function Show({ property, units, staff, canManage, form, photos, maxPhotos }: Props) {
+    const [editing, setEditing] = useUrlModal('edit');
     const { flash } = usePage<SharedData>().props;
     const [dialog, setDialog] = useState<{ open: boolean; unit: UnitRow | null }>({ open: false, unit: null });
 
@@ -48,30 +58,58 @@ export default function Show({ property, units, staff, canManage }: Props) {
             <Head title={property.name} />
 
             <div className="mx-auto w-full max-w-5xl space-y-6 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight">{property.name}</h1>
-                        <p className="text-sm text-muted-foreground">
-                            {propertyTypeLabels[property.type] ?? property.type} &middot; {property.code}
-                        </p>
-                        <p className="mt-1 text-sm">{property.address}</p>
+                <PageHeader
+                    icon={Building2}
+                    title={property.name}
+                    description={
+                        <span className="flex items-start gap-1">
+                            <MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                            {property.address}
+                        </span>
+                    }
+                    actions={
+                        canManage && (
+                            <>
+                                {property.show_on_website && (
+                                    <Button asChild variant="ghost">
+                                        <a href={route('listings.show', property.code)} target="_blank" rel="noopener noreferrer">
+                                            <ExternalLink /> View public page
+                                        </a>
+                                    </Button>
+                                )}
+                                {form && (
+                                    <Button variant="outline" onClick={() => setEditing(true)}>
+                                        <Pencil /> Edit property
+                                    </Button>
+                                )}
+                                <Button onClick={() => edit(null)}>
+                                    <Plus /> Add room
+                                </Button>
+                            </>
+                        )
+                    }
+                >
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                        <Badge variant="muted">{propertyTypeLabels[property.type] ?? property.type}</Badge>
+                        <Badge variant="outline" className="font-mono">
+                            {property.code}
+                        </Badge>
+                        {property.show_on_website ? (
+                            <Badge variant="success">
+                                <Globe className="size-3" aria-hidden /> Listed on website
+                            </Badge>
+                        ) : (
+                            <Badge variant="muted">
+                                <Globe className="size-3" aria-hidden /> Not on website
+                            </Badge>
+                        )}
                         {canManage && (
-                            <p className="mt-1 text-sm text-muted-foreground">Staff: {staff.length ? staff.map((s) => s.name).join(', ') : 'none assigned'}</p>
+                            <Badge variant="info">
+                                <Users className="size-3" aria-hidden /> {staff.length ? staff.map((s) => s.name).join(', ') : 'No staff assigned'}
+                            </Badge>
                         )}
                     </div>
-                    {canManage && (
-                        <div className="flex flex-wrap gap-2">
-                            <Button asChild variant="outline" size="lg">
-                                <Link href={route('properties.edit', property.id)}>
-                                    <Pencil /> Edit property
-                                </Link>
-                            </Button>
-                            <Button size="lg" onClick={() => edit(null)}>
-                                <Plus /> Add room
-                            </Button>
-                        </div>
-                    )}
-                </div>
+                </PageHeader>
 
                 {flash.success && (
                     <Alert role="status">
@@ -79,32 +117,49 @@ export default function Show({ property, units, staff, canManage }: Props) {
                     </Alert>
                 )}
 
+                <PropertyPhotos propertyId={property.id} photos={photos} max={maxPhotos} canManage={canManage} listed={property.show_on_website} />
+
+                <h2 className="text-lg font-semibold">Rooms</h2>
                 {units.length === 0 ? (
-                    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed p-10 text-center">
-                        <BedDouble className="size-10 text-muted-foreground" aria-hidden />
-                        <h2 className="text-lg font-medium">No rooms yet</h2>
-                        <p className="max-w-md text-sm text-muted-foreground">
-                            {canManage ? 'Add the rooms people can rent. Tenants move into rooms.' : 'The owner has not added any rooms here yet.'}
-                        </p>
-                        {canManage && (
-                            <Button size="lg" onClick={() => edit(null)}>
-                                Add the first room
-                            </Button>
-                        )}
-                    </div>
+                    <EmptyState
+                        icon={BedDouble}
+                        title="No rooms yet"
+                        description={
+                            canManage ? 'Add the rooms people can rent. Tenants move into rooms.' : 'The owner has not added any rooms here yet.'
+                        }
+                        action={
+                            canManage && (
+                                <Button onClick={() => edit(null)}>
+                                    <Plus /> Add the first room
+                                </Button>
+                            )
+                        }
+                    />
                 ) : (
                     <>
-                        <div className="hidden overflow-x-auto rounded-lg border md:block">
+                        <div className="surface hidden overflow-x-auto md:block">
                             <table className="w-full text-sm">
                                 <caption className="sr-only">Rooms in {property.name}</caption>
                                 <thead className="bg-muted/50 text-left">
                                     <tr>
-                                        <th scope="col" className="px-3 py-2 font-medium">Room</th>
-                                        <th scope="col" className="px-3 py-2 font-medium">Building / floor</th>
-                                        <th scope="col" className="px-3 py-2 font-medium">Rent</th>
-                                        <th scope="col" className="px-3 py-2 font-medium">Occupied</th>
-                                        <th scope="col" className="px-3 py-2 font-medium">Status</th>
-                                        <th scope="col" className="px-3 py-2 font-medium">Who lives here</th>
+                                        <th scope="col" className="px-3 py-2 font-medium">
+                                            Room
+                                        </th>
+                                        <th scope="col" className="px-3 py-2 font-medium">
+                                            Building / floor
+                                        </th>
+                                        <th scope="col" className="px-3 py-2 font-medium">
+                                            Rent
+                                        </th>
+                                        <th scope="col" className="px-3 py-2 font-medium">
+                                            Occupied
+                                        </th>
+                                        <th scope="col" className="px-3 py-2 font-medium">
+                                            Status
+                                        </th>
+                                        <th scope="col" className="px-3 py-2 font-medium">
+                                            Who lives here
+                                        </th>
                                         {canManage && (
                                             <th scope="col" className="px-3 py-2">
                                                 <span className="sr-only">Actions</span>
@@ -115,15 +170,28 @@ export default function Show({ property, units, staff, canManage }: Props) {
                                 <tbody>
                                     {units.map((unit) => (
                                         <tr key={unit.id} className="border-t align-top">
-                                            <th scope="row" className="px-3 py-2 text-left font-medium">{unit.code}</th>
+                                            <th scope="row" className="px-3 py-2 text-left font-medium">
+                                                {unit.code}
+                                            </th>
                                             <td className="px-3 py-2">{place(unit)}</td>
                                             <td className="px-3 py-2">{rentModeLabels[unit.rent_mode]}</td>
-                                            <td className="px-3 py-2">{unit.occupied} of {unit.capacity}</td>
-                                            <td className="px-3 py-2"><UnitStatusBadge status={unit.display_status} /></td>
-                                            <td className="px-3 py-2"><Occupants unit={unit} /></td>
+                                            <td className="px-3 py-2">
+                                                {unit.occupied} of {unit.capacity}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <UnitStatusBadge status={unit.display_status} />
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <Occupants unit={unit} />
+                                            </td>
                                             {canManage && (
                                                 <td className="px-3 py-2 text-right">
-                                                    <Button variant="outline" size="sm" onClick={() => edit(unit)} aria-label={`Edit room ${unit.code}`}>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => edit(unit)}
+                                                        aria-label={`Edit room ${unit.code}`}
+                                                    >
                                                         Edit
                                                     </Button>
                                                 </td>
@@ -136,15 +204,17 @@ export default function Show({ property, units, staff, canManage }: Props) {
 
                         <ul className="grid gap-3 md:hidden">
                             {units.map((unit) => (
-                                <li key={unit.id} className="space-y-2 rounded-lg border p-4">
+                                <li key={unit.id} className="surface space-y-2 p-4">
                                     <div className="flex items-center justify-between gap-2">
                                         <h2 className="text-lg font-semibold">Room {unit.code}</h2>
                                         <UnitStatusBadge status={unit.display_status} />
                                     </div>
-                                    <p className="text-sm text-muted-foreground">
+                                    <p className="text-muted-foreground text-sm">
                                         {place(unit)} &middot; {rentModeLabels[unit.rent_mode]} &middot; {unit.occupied} of {unit.capacity} occupied
                                     </p>
-                                    <div className="text-sm"><Occupants unit={unit} /></div>
+                                    <div className="text-sm">
+                                        <Occupants unit={unit} />
+                                    </div>
                                     {canManage && (
                                         <Button variant="outline" onClick={() => edit(unit)} aria-label={`Edit room ${unit.code}`}>
                                             Edit room
@@ -157,8 +227,14 @@ export default function Show({ property, units, staff, canManage }: Props) {
                 )}
             </div>
 
+            {form && <PropertyFormDialog open={editing} onOpenChange={setEditing} form={form} />}
             {canManage && (
-                <UnitDialog propertyId={property.id} unit={dialog.unit} open={dialog.open} onOpenChange={(open) => setDialog((d) => ({ ...d, open }))} />
+                <UnitDialog
+                    propertyId={property.id}
+                    unit={dialog.unit}
+                    open={dialog.open}
+                    onOpenChange={(open) => setDialog((d) => ({ ...d, open }))}
+                />
             )}
         </AppLayout>
     );

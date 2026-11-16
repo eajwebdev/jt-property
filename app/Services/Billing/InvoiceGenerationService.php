@@ -42,13 +42,13 @@ class InvoiceGenerationService
     ) {}
 
     /** @param  list<int>|null  $agreementIds */
-    public function generate(int $year, int $month, User $by, ?int $propertyId = null, ?array $agreementIds = null): BillingBatch
+    public function generate(int $year, int $month, User $by, ?int $propertyId = null, ?array $agreementIds = null, ?array $accountIds = null): BillingBatch
     {
         $this->authorize($by);
 
         $batch = BillingBatch::create(['year' => $year, 'month' => $month, 'property_id' => $propertyId, 'created_by' => $by->id, 'status' => 'running']);
 
-        foreach ($this->preview->agreements($year, $month, $propertyId, $agreementIds, null) as $agreement) {
+        foreach ($this->preview->agreements($year, $month, $propertyId, $agreementIds, null, $accountIds) as $agreement) {
             if ($this->cycles->cycleFor($agreement, $year, $month) === null) {
                 continue;
             }
@@ -92,6 +92,10 @@ class InvoiceGenerationService
             if ($invoice->status !== InvoiceStatus::Finalized) {
                 throw ValidationException::withMessages(['invoice' => 'This bill is already void.']);
             }
+            // A month is closed once a later month is billed: its balance is already carried into that later bill.
+            if ($this->closedBy($invoice) !== null) {
+                throw ValidationException::withMessages(['invoice' => 'This month is closed: a later bill already carries its balance. Delete the later month first.']);
+            }
 
             $entry = LedgerEntry::where('invoice_id', $invoice->id)->whereIn('type', [LedgerEntryType::Charge, LedgerEntryType::Credit])->first();
             if ($entry !== null) {
@@ -104,6 +108,41 @@ class InvoiceGenerationService
             $utilityBills = $this->reopenUtilityBills($invoice);
             Audit::log('invoice.voided', $invoice, ['number' => $invoice->number, 'amount_cents' => $invoice->current_charges_cents, 'reason' => $reason, 'utility_bills' => $utilityBills]);
         });
+    }
+
+    /**
+     * Voids every bill of one month (one property or all), for the latest billed month only: "delete the month and
+     * generate again". Each bill is voided as above (charge reversed, payments back to credit, one-time charges and
+     * utility bills released). Nothing is erased; the void reason is kept on every bill.
+     *
+     * @param  list<int>  $propertyIds
+     */
+    public function voidMonth(int $year, int $month, array $propertyIds, string $reason, User $by): int
+    {
+        $this->authorize($by);
+        $invoices = Invoice::where('status', InvoiceStatus::Finalized)->whereIn('property_id', $propertyIds)
+            ->whereYear('period_start', $year)->whereMonth('period_start', $month)->orderBy('id')->get();
+        if ($invoices->contains(fn (Invoice $i) => $this->closedBy($i) !== null)) {
+            throw ValidationException::withMessages(['month' => 'Only the latest billed month can be deleted. Delete the later month first.']);
+        }
+
+        DB::transaction(function () use ($invoices, $reason, $by) {
+            foreach ($invoices as $invoice) {
+                $this->void($invoice, $reason, $by);
+                // Unlike a single void (the charge stays on the void bill), deleting the month sends its one-time
+                // charges (e.g. the electric bills) back to waiting, so generating the month again includes them.
+                OneTimeCharge::where('invoice_id', $invoice->id)->update(['invoice_id' => null]);
+            }
+        });
+
+        return $invoices->count();
+    }
+
+    /** The later bill (same rental) that closes this bill's month, if any. */
+    public function closedBy(Invoice $invoice): ?Invoice
+    {
+        return Invoice::where('rental_agreement_id', $invoice->rental_agreement_id)->where('status', InvoiceStatus::Finalized)
+            ->whereDate('period_start', '>', $invoice->period_start->toDateString())->orderBy('period_start')->first();
     }
 
     /**
@@ -199,6 +238,9 @@ class InvoiceGenerationService
         if ($finalized = $existing->firstWhere('status', InvoiceStatus::Finalized)) {
             return [BatchItemStatus::AlreadyBilled, $finalized, null];
         }
+        if (Invoice::where('rental_agreement_id', $agreement->id)->where('status', InvoiceStatus::Finalized)->whereDate('period_start', '>', $start)->exists()) {
+            return [BatchItemStatus::Skipped, null, 'This month is closed: a later month is already billed.'];
+        }
 
         $built = $this->preview->linesForAgreement($agreement, $cycle);
         if ($built['needs_review']) {
@@ -267,8 +309,6 @@ class InvoiceGenerationService
     private function billUtilities(array $lines, BillingCycle $cycle): void
     {
         $ids = collect($lines)->pluck('source')->filter(fn ($s) => $s instanceof UtilityBill)->pluck('id')->unique();
-        $year = $cycle->periodStart->year;
-        $month = $cycle->periodStart->month;
 
         foreach ($ids as $id) {
             $bill = UtilityBill::with('unit')->lockForUpdate()->findOrFail($id);
@@ -276,6 +316,9 @@ class InvoiceGenerationService
                 continue;
             }
 
+            // Shares follow who lived in the unit in the bill's own month (a late bill is billed in a later cycle).
+            $year = (int) $bill->bill_month->format('Y');
+            $month = (int) $bill->bill_month->format('n');
             $agreements = $this->utilities->eligibleAgreements($bill->unit, $year, $month);
             $cycles = $agreements->mapWithKeys(fn ($a) => [$a->id => $this->cycles->cycleFor($a, $year, $month)])->all();
             $basis = $this->utilities->basis($bill);
