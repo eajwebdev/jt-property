@@ -123,6 +123,8 @@ class UserManagementTest extends TestCase
 
         $this->assertDatabaseCount('users', 1);
         $this->assertDatabaseHas('users', ['email' => 'owner@jt', 'role' => 'owner']);
+
+        $this->app['env'] = 'testing';
         $this->post('/login', ['email' => 'owner@jt', 'password' => 'Production-Seed-Password-123'])
             ->assertRedirect(route('dashboard', absolute: false));
         $this->assertAuthenticatedAs(User::where('email', 'owner@jt')->firstOrFail());
