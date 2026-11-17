@@ -20,7 +20,9 @@
         <meta property="og:site_name" content="{{ config('app.name') }}">
         <meta property="og:title" content="{{ $shareTitle }}">
         <meta property="og:description" content="{{ $shareText }}">
-        <meta property="og:url" content="{{ url('/') }}">
+        {{-- The page itself: "/" redirects to /login, so pointing here at "/" sends Facebook in a redirect loop (no card). --}}
+        <meta property="og:url" content="{{ url()->current() }}">
+        <link rel="canonical" href="{{ url()->current() }}">
         <meta property="og:locale" content="en_PH">
         <meta property="og:image" content="{{ asset('branding/og-image.jpg') }}">
         <meta property="og:image:secure_url" content="{{ secure_asset('branding/og-image.jpg') }}">

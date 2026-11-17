@@ -23,6 +23,8 @@ class LinkPreviewTest extends TestCase
         ] as $tag) {
             $this->assertStringContainsString($tag, $html);
         }
+        // og:url must be the page itself. Pointing at "/" (which redirects to /login) made Facebook loop and show no card.
+        $this->assertStringContainsString('<meta property="og:url" content="'.url('/login').'">', $html);
         $this->assertMatchesRegularExpression('/<meta property="og:title" content="[^"]+">/', $html);
         $this->assertMatchesRegularExpression('/<meta property="og:description" content="[^"]+">/', $html);
         $this->assertMatchesRegularExpression('/<meta name="description" content="[^"]+">/', $html);
