@@ -224,7 +224,23 @@ class UtilityAllocationService
             ->get()
             ->mapWithKeys(fn (RentalAgreement $a) => [$a->id => ['agreement' => $a, 'days' => $this->cycles->cycleFor($a, $year, $month)?->coveredDays($a) ?? 0]])
             ->filter(fn ($e) => $e['days'] > 0)
+            // A free stay (₱0 rent this month, e.g. a student assistant) does not share the room's utility bill.
+            ->filter(fn ($e) => ($this->freeStays($e['agreement']->unit_id, $first)[$e['agreement']->id] ?? false) === false)
             ->sortKeys();
+    }
+
+    /** @var array<string, array<int, bool>> */
+    private array $freeStayCache = [];
+
+    /** @return array<int, bool> agreement id => rent is ₱0 on the first of the month */
+    private function freeStays(int $unitId, CarbonImmutable $first): array
+    {
+        return $this->freeStayCache[$unitId.'|'.$first->toDateString()] ??= (function () use ($unitId, $first) {
+            $agreements = RentalAgreement::where('unit_id', $unitId)->get();
+            $rents = RentalAgreement::currentRents($agreements, $first->endOfMonth()->toDateString());
+
+            return $agreements->mapWithKeys(fn (RentalAgreement $a) => [$a->id => array_key_exists($a->id, $rents) && (int) $rents[$a->id] === 0])->all();
+        })();
     }
 
     /** @return array<int, int>|null null when the unit's percent/manual setup cannot cover these agreements */

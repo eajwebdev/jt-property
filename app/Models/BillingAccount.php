@@ -12,11 +12,11 @@ class BillingAccount extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['property_id', 'payer_tenant_id', 'status'];
+    protected $fillable = ['property_id', 'payer_tenant_id', 'status', 'soa_remarks', 'soa_remarks_as_of'];
 
     protected function casts(): array
     {
-        return ['status' => AccountStatus::class];
+        return ['status' => AccountStatus::class, 'soa_remarks_as_of' => 'date'];
     }
 
     protected static function booted(): void

@@ -114,12 +114,13 @@ class UserManagementTest extends TestCase
         $this->assertTrue(auth()->user()->isOwner());
     }
 
-    public function test_production_seed_creates_only_the_owner_and_allows_login(): void
+    public function test_production_seed_creates_only_the_owner_login_and_allows_login(): void
     {
         $this->app['env'] = 'production';
         config(['app.seed_password' => 'Production-Seed-Password-123']);
 
-        (new DatabaseSeeder)->run();
+        // The server seed also loads the real and demo data, but only one login: the owner.
+        $this->artisan('db:seed', ['--class' => DatabaseSeeder::class, '--force' => true])->assertSuccessful();
 
         $this->assertDatabaseCount('users', 1);
         $this->assertDatabaseHas('users', ['email' => 'owner@jt', 'role' => 'owner']);

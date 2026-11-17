@@ -29,6 +29,9 @@ class Settings
         'late_fee_policy' => 'none',
         'late_fee_value' => 0,
         'late_fee_grace_days' => 0,
+        // Signature block of the printed Statement of Accounts ("Prepared by:").
+        'soa_prepared_by' => '',
+        'soa_prepared_by_title' => 'Owner',
     ];
 
     /** @var array<string, mixed>|null */

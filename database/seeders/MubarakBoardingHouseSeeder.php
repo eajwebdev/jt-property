@@ -28,17 +28,20 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
- * Mubarak Boarding House exactly as the paper "2026 Statement of Accounts (October)" (as of 5 October 2026):
- * all 72 rows (61 current boarders + 11 previous boarders with accounts; SHANGCO is on both lists = one tenant,
- * two accounts, so 71 tenants). The system starts in October 2026:
+ * Mubarak Boarding House exactly as "2026 Statement of Accounts (October).xlsx" (as of 5 October 2026): its 61
+ * "Current Boarders" rows, in the same order, with the same room, rate, amounts and remark, so the app's printed
+ * Statement of Accounts as of 5 October 2026 is the same sheet. The system starts in October 2026:
  *
  *  - Before October ("previous unpaid", entered once, never billed): every BH month before October and EB that
- *    spans several months, plus the previous boarders' balances -> one approved opening balance per account,
+ *    spans several months -> one approved opening balance per account,
  *    dated 30 Sep 2026, with BH / EB lines per month (the same thing an owner enters in Opening Balances).
  *  - October = the first bills the system makes: October BH (monthly rate) + the September EB shown on the paper,
  *    as a one-time "Electricity - September 2026" charge. Boarders the paper does not list for October BH already
  *    paid it: a payment ("paid before the system started") settles their October bill.
  *  - From November the system bills as usual; anything still unpaid is the "previous balance" on the next bill.
+ *  - Free stay (student assistant, rate 0): a ₱0 rental in the room, so the boarder is listed; pays no electricity.
+ *  - Each account keeps the sheet's remark word for word for the 5 October 2026 sheet (later sheets write their own).
+ *  - Old accounts of previous boarders are not on this sheet: see MubarakPreviousBoardersSeeder (optional).
  *
  * Source data: database/seeders/data/mubarak-statement-2026-10.json (parsed from the spreadsheet).
  *
@@ -46,7 +49,7 @@ use RuntimeException;
  *  - rentals start 1 January 2026 and are due on the 5th (the sheet is "as of October 05");
  *  - rooms rented at ₱1,000 or more are whole rooms, the rest are bedspaces with one bed per boarder;
  *  - boarders without "(no deposit)" paid a one-month deposit equal to their monthly rate;
- *  - electricity is a shared room bill split by days (enter each room's bill monthly); water is free.
+ *  - electricity is one bill per room, split equally between its paying boarders (enter it monthly); water is free.
  */
 class MubarakBoardingHouseSeeder extends Seeder
 {
@@ -58,6 +61,9 @@ class MubarakBoardingHouseSeeder extends Seeder
     private const FIRST_MONTH = '2026-10';
 
     private const RENTAL_START = '2026-01-01';
+
+    /** The date the paper sheet is "as of". */
+    public const SHEET_AS_OF = '2026-10-05';
 
     private const DUE_DAY = 5;
 
@@ -87,6 +93,8 @@ class MubarakBoardingHouseSeeder extends Seeder
 
         Settings::set('company_name', 'Mubarak Boarding House', $owner);
         Settings::set('company_address', 'Purok CPSU Uno, Barangay Camingawan, Kabankalan City', $owner);
+        Settings::set('soa_prepared_by', 'CHRISTIAN G. TAGUINES', $owner);
+        Settings::set('soa_prepared_by_title', 'Owner', $owner);
 
         $property = Property::create([
             'name' => 'Mubarak Boarding House',
@@ -97,9 +105,7 @@ class MubarakBoardingHouseSeeder extends Seeder
             'description' => "Creekside House, BIND House, Jerry's House (Main and Annex) and Main House.",
         ]);
 
-        // Sections exactly as on the sheet. A boarder on both lists (SHANGCO: current room + an old unpaid stay)
-        // is one tenant with two accounts, so each section's subtotal matches the paper.
-        [$current, $previous] = $rows->partition(fn ($r) => $r['section'] === 'current');
+        $current = $rows->where('section', 'current')->values();
         $electricity = ChargeCategory::where('name', 'Electricity')->value('id');
 
         $units = $this->units($property, $current);
@@ -111,10 +117,8 @@ class MubarakBoardingHouseSeeder extends Seeder
             $unit = $units[$row['building'].'|'.$row['room']];
             $tenant = $this->tenant($property, $row);
             if ($row['rate_cents'] <= 0) {
-                // Free stay (e.g. student assistant): no rental to bill; the bed stays counted in the room.
-                $tenant->update(['remarks' => trim('No rent. '.$row['remark'])]);
-
-                continue;
+                // Free stay (e.g. student assistant): a ₱0 rental keeps them on the sheet and in their bed.
+                $tenant->update(['remarks' => trim('Free stay (no rent, no electricity share). '.$row['remark'])]);
             }
 
             $bed = null;
@@ -123,7 +127,9 @@ class MubarakBoardingHouseSeeder extends Seeder
                 $bed = $unit->beds()->orderBy('id')->skip($index)->first();
             }
             $agreement = $tenancy->startAgreement($tenant, $unit, $bed, $row['rate_cents'], self::DUE_DAY, $start);
-            if (! $row['no_deposit']) {
+            // The sheet's remark, word for word, for the 5 October 2026 sheet.
+            $agreement->billingAccount->update(['soa_remarks' => $row['remark'], 'soa_remarks_as_of' => self::SHEET_AS_OF]);
+            if (! $row['no_deposit'] && $row['rate_cents'] > 0) {
                 $tenancy->recordDeposit($agreement->billingAccount, $row['rate_cents'], $start, $agreement, 'Assumed one-month deposit (Oct 2026 Statement of Accounts lists no "(no deposit)" for this boarder).');
             }
 
@@ -165,16 +171,6 @@ class MubarakBoardingHouseSeeder extends Seeder
         foreach ($accounts as [$agreement, $row, $opening]) {
             $this->opening($openings, $agreement->billingAccount, $opening, $asOf, $row['remark']);
         }
-        foreach ($previous as $row) {
-            // Still boarding (on the current list too)? Same person, separate account for the old stay.
-            $tenant = Tenant::where('property_id', $property->id)->where('full_name', $row['name'])->first();
-            if ($tenant === null) {
-                $tenant = $this->tenant($property, $row);
-                $tenant->update(['archived_at' => $asOf]);
-            }
-            $account = BillingAccount::create(['property_id' => $property->id, 'payer_tenant_id' => $tenant->id]);
-            $this->opening($openings, $account, $row['breakdown'], $asOf, $row['remark'] ?: 'Previous boarder with an unpaid account.');
-        }
 
         // 5. From November each room's electric bill is entered monthly and split equally between its boarders.
         foreach ($units as $unit) {
@@ -207,7 +203,7 @@ class MubarakBoardingHouseSeeder extends Seeder
         return $units;
     }
 
-    private function tenant(Property $property, array $row): Tenant
+    public function tenant(Property $property, array $row): Tenant
     {
         return $property->tenants()->create([
             'full_name' => $row['name'],
@@ -218,7 +214,7 @@ class MubarakBoardingHouseSeeder extends Seeder
     }
 
     /** One approved opening balance per account; each breakdown line keeps its category (rent/electric) and months. */
-    private function opening(OpeningBalanceService $openings, BillingAccount $account, array $breakdown, Carbon $asOf, string $notes): void
+    public function opening(OpeningBalanceService $openings, BillingAccount $account, array $breakdown, Carbon $asOf, string $notes): void
     {
         $total = array_sum(array_column($breakdown, 'amount_cents'));
         if ($total <= 0) {

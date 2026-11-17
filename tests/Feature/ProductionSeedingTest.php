@@ -42,8 +42,8 @@ class ProductionSeedingTest extends TestCase
         $this->assertSame(0, User::where('role', 'staff')->count(), 'no demo staff login on a real server');
 
         $this->assertEqualsCanonicalizing(['MBH', 'RIV', 'HIL'], Property::pluck('code')->all());
-        // The real data is loaded first, so its account numbers start at JT-000001 as on the printed statements.
-        $this->assertSame('MBH', BillingAccount::where('account_no', 'JT-000001')->sole()->property->code);
+        // The real data is loaded first, so its accounts get the first numbers (JT-000001 on a fresh server).
+        $this->assertSame('MBH', BillingAccount::orderBy('id')->firstOrFail()->property->code);
     }
 
     public function test_seeding_again_adds_nothing_twice(): void

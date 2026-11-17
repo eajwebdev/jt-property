@@ -76,6 +76,11 @@ class StatementOfAccountsReport
             if ($mine->isNotEmpty() && ! $withDeposit->has($account->id)) {
                 $remarks[] = '(no deposit)';
             }
+            // A remark written on a paper sheet (e.g. the imported October 2026 sheet) is printed word for word on that
+            // month's sheet; other months write their own from the unpaid months.
+            if ($account->soa_remarks !== null && $account->soa_remarks_as_of?->format('Y-m') === $asOf->format('Y-m')) {
+                $remarks = [$account->soa_remarks];
+            }
 
             $shown = $mine->isNotEmpty() ? $mine : $account->agreements->sortByDesc('start_date')->take(1);
             $line = [
@@ -274,8 +279,7 @@ class StatementOfAccountsReport
 
     private function room(RentalAgreement $agreement): string
     {
-        $unit = $agreement->unit;
-
-        return $unit->label.($agreement->bed ? ' · '.$agreement->bed->label : '');
+        // As on the paper sheet: building and room only ("Creekside House - Room #5"), no bed.
+        return $agreement->unit->label;
     }
 }

@@ -12,11 +12,13 @@ use App\Models\SecurityDeposit;
 use App\Models\Tenant;
 use App\Models\Unit;
 use App\Models\User;
+use App\Models\UtilityBill;
 use App\Services\Billing\BillingPreviewService;
 use App\Services\Billing\InvoiceGenerationService;
 use App\Services\Billing\ReceivableLedgerService;
 use App\Services\Billing\StatementOfAccountsReport;
 use Database\Seeders\MubarakBoardingHouseSeeder;
+use Database\Seeders\MubarakPreviousBoardersSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -37,37 +39,51 @@ class MubarakSeederTest extends TestCase
         $this->assertSame(27, Unit::where('property_id', $property->id)->count());
         $this->assertSame(2, Unit::where('property_id', $property->id)->where('code', 'Room #2')->whereIn('building', ['BIND House', 'Creekside House'])->count());
 
-        // People: the sheet's 72 rows = 61 current + 11 previous; SHANGCO is on both lists (one person, two accounts).
-        $this->assertSame(71, Tenant::where('property_id', $property->id)->count());
-        $this->assertSame(61, Tenant::where('property_id', $property->id)->whereNull('archived_at')->count());
-        $this->assertSame(10, Tenant::where('property_id', $property->id)->whereNotNull('archived_at')->count());
-        $this->assertSame(2, BillingAccount::whereHas('payer', fn ($q) => $q->where('full_name', 'SHANGCO, Windel Gasapo'))->count());
-        $this->assertSame(60, RentalAgreement::count()); // RALO, Lhougan: free stay, no rental
+        // People: exactly the sheet's 61 "Current Boarders" (the sheet has no previous-boarders section).
+        $this->assertSame(61, Tenant::where('property_id', $property->id)->count());
+        $this->assertSame(0, Tenant::where('property_id', $property->id)->whereNotNull('archived_at')->count());
+        $this->assertSame(61, RentalAgreement::count()); // RALO, Lhougan included: a ₱0 free stay (student assistant)
 
-        // Current boarders = the sheet's Current Boarders Sub-Total (rate 54,800 · BH 99,099.26 · EB 8,333.55 · 107,432.81).
+        // The printed sheet, row by row, = database/seeders/data/mubarak-statement-2026-10.json (checked against the .xlsx).
+        $sheet = json_decode((string) file_get_contents(database_path('seeders/data/mubarak-statement-2026-10.json')), true);
         $report = app(StatementOfAccountsReport::class)->build($property, Carbon::parse('2026-10-05'));
-        $current = $report['sections']['Current Boarders'];
-        $this->assertCount(60, $current);
-        $this->assertSame(5480000, $current->sum('rate_cents'));
-        $this->assertSame(9909926, $current->sum('columns.rent'));
-        $this->assertSame(833355, $current->sum('columns.electric'));
+        $current = $report['sections']['Current Boarders']->values();
+        $this->assertSame(['Current Boarders'], array_keys($report['sections']));
+        $this->assertCount(61, $current);
+        foreach ($sheet as $i => $paper) {
+            $line = $current[$i];
+            $no = ($i + 1).'. '.$paper['name'];
+            $this->assertSame($paper['name'], $line['name'], $no);
+            $this->assertSame($paper['building'].' - '.$paper['room'], $line['room'], $no);
+            $this->assertSame($paper['rate_cents'], $line['rate_cents'], $no);
+            $this->assertSame($paper['rent_cents'], $line['columns']['rent'], $no);
+            $this->assertSame($paper['electric_cents'], $line['columns']['electric'], $no);
+            $this->assertSame(0, $line['columns']['advance'] + $line['columns']['deposit'] + $line['columns']['key'] + $line['columns']['others'], $no);
+            $this->assertSame($paper['total_cents'], $line['total_cents'], $no);
+            $this->assertSame($paper['remark'], $line['remarks'], $no);
+        }
+        // GRAND TOTAL: rate 54,800.00 · monthly due 99,099.26 · electric 8,333.55 · total 107,432.81.
+        $this->assertSame(5480000, $report['totals']['rate']);
+        $this->assertSame(9909926, $report['totals']['rent']);
+        $this->assertSame(833355, $report['totals']['electric']);
         $this->assertSame(10743281, $report['totals']['total']);
-        $row = fn (string $name) => $current->firstWhere('name', $name);
-        $this->assertSame('Creekside House - Room #5 · Bed 1', $row('ACABAL, Praise Rodriguez')['room']);
-        $this->assertSame('October 2026 BH & September 2026 EB accounts', $row('ACABAL, Praise Rodriguez')['remarks']);
-        $this->assertSame('Balance of September + October 2026 BH accounts (no deposit)', $row('BACONGCO, Jundil & Trixie Mae Alyawan')['remarks']);
-        $this->assertSame(8480, $row('SHANGCO, Windel Gasapo')['total_cents']);
-        $this->assertSame(1407699, $row('SERILLA, Joevani Taberos')['total_cents']);
 
-        // Previous boarders with accounts: every row of the sheet (BH 6,461.15 + EB 781.56 = 7,242.71) is owed on its account.
-        $previous = BillingAccount::where('property_id', $property->id)->whereDoesntHave('agreements')->get();
-        $this->assertCount(11, $previous);
-        $ledger = app(ReceivableLedgerService::class);
-        $this->assertSame(646115 + 78156, $previous->sum(fn ($a) => $ledger->balance($a)));
-        $this->assertSame(248166, $ledger->balance($previous->first(fn ($a) => $a->payer->full_name === 'SHANGCO, Windel Gasapo')));
+        // The paper's remarks belong to October 2026; later sheets write their own.
+        $later = app(StatementOfAccountsReport::class)->build($property, Carbon::parse('2026-11-05'))['sections']['Current Boarders'];
+        $this->assertNotSame('x', $later->firstWhere('name', 'VILLACAMPA, Joven Rey Cabunson')['remarks']);
+
+        // A free stay pays no rent and no share of the room's electric bill (BIND House Room #2 is split 3 ways).
+        $bind2 = Unit::where('building', 'BIND House')->where('code', 'Room #2')->sole();
+        UtilityBill::create(['unit_id' => $bind2->id, 'type' => 'electricity', 'bill_month' => '2026-11-01', 'amount_cents' => 30000, 'status' => 'draft']);
+        $shares = collect(app(BillingPreviewService::class)->preview(2026, 11, $property->id, null, $owner)['rows'])
+            ->filter(fn ($r) => str_starts_with($r->unitLabel, 'BIND House - Room #2'))
+            ->mapWithKeys(fn ($r) => [$r->tenantLabel => collect($r->lines)->where('category', 'utility')->sum('amount_cents')]);
+        $this->assertSame(0, $shares['RALO, Lhougan Daquiaog']);
+        $this->assertSame([10000, 10000, 10000], $shares->except('RALO, Lhougan Daquiaog')->values()->all());
+        UtilityBill::query()->delete();
 
         // October = the first system bills: rent + the September electricity as one-time charges.
-        $this->assertSame(60, Invoice::whereDate('period_start', '2026-10-01')->count());
+        $this->assertSame(61, Invoice::whereDate('period_start', '2026-10-01')->count());
         $this->assertSame(OneTimeCharge::count(), OneTimeCharge::whereNotNull('invoice_id')->count());
         $acabal = Invoice::whereHas('billingAccount.payer', fn ($q) => $q->where('full_name', 'ACABAL, Praise Rodriguez'))->sole();
         $this->assertSame(['Monthly Rental', 'Electricity – September 2026'], $acabal->lineItems->pluck('label')->all());
@@ -84,6 +100,26 @@ class MubarakSeederTest extends TestCase
         $this->assertSame(161026, $preview['ALIPO-ON, Erika Dinaguit']->previousBalanceCents);
         $again = app(InvoiceGenerationService::class)->generate(2026, 10, $owner, $property->id);
         $this->assertSame(0, $again->items()->where('status', 'generated')->count());
+    }
+
+    public function test_previous_boarders_are_a_separate_optional_seed(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-16 09:00', 'Asia/Manila'));
+        User::factory()->owner()->create();
+        $this->seed(MubarakBoardingHouseSeeder::class);
+        $this->seed(MubarakPreviousBoardersSeeder::class);
+        $this->seed(MubarakPreviousBoardersSeeder::class); // safe to run twice
+
+        // 11 old accounts (BH 6,461.15 + EB 781.56 = 7,242.71); SHANGCO is also a current boarder (one person, two accounts).
+        $property = Property::where('code', 'MBH')->sole();
+        $previous = BillingAccount::where('property_id', $property->id)->whereDoesntHave('agreements')->get();
+        $this->assertCount(11, $previous);
+        $ledger = app(ReceivableLedgerService::class);
+        $this->assertSame(646115 + 78156, $previous->sum(fn ($a) => $ledger->balance($a)));
+        $this->assertSame(2, BillingAccount::whereHas('payer', fn ($q) => $q->where('full_name', 'SHANGCO, Windel Gasapo'))->count());
+        // Not on the printed sheet: it lists current boarders only.
+        $report = app(StatementOfAccountsReport::class)->build($property, Carbon::parse('2026-10-05'));
+        $this->assertCount(61, $report['sections']['Current Boarders']);
     }
 
     public function test_room_numbers_are_unique_per_building(): void
