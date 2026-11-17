@@ -5,7 +5,7 @@
         ? 'All accessible properties'
         : $properties->firstWhere('id', $filters['property_id'])?->name;
     $agingBuckets = ['current', '1-30', '31-60', '61-90', '90+'];
-    $logo = 'data:image/webp;base64,'.base64_encode((string) @file_get_contents(resource_path('img/mubarak-logo-horizontal-pdf.webp')));
+    $logo = 'data:image/png;base64,'.base64_encode((string) @file_get_contents(resource_path('img/mubarak-logo-horizontal-pdf.png')));
 @endphp
 <!doctype html>
 <html lang="en">
@@ -15,15 +15,15 @@
     <style>
         @page { size: A4 landscape; }
         * { box-sizing: border-box; }
-        body { margin: 0; color: #142638; font: 10px/1.4 Arial, sans-serif; }
-        .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0B7A48; padding-bottom: 12px; }
+        body { margin: 0; color: #142638; font: 10px/1.4 {!! config('laravel-pdf.driver') === 'dompdf' ? "'DejaVu Sans', " : '' !!}Arial, sans-serif; }
+        .header { width: 100%; border-collapse: collapse; table-layout: auto; border-bottom: 3px solid #0B7A48; } .header td { border: 0; padding: 0 0 12px; vertical-align: middle; }
         .logo { width: 170px; max-height: 50px; object-fit: contain; object-position: left center; }
         h1 { margin: 15px 0 2px; color: #0B3466; font-size: 23px; }
         h2 { margin: 20px 0 8px; color: #0B3466; font-size: 14px; }
         .muted { color: #52637a; }
         .period { text-align: right; }
-        .metrics { display: flex; gap: 8px; margin-top: 15px; }
-        .metric { flex: 1; padding: 10px; background: #eef5f8; border-radius: 5px; }
+        .metrics { width: 100%; border-collapse: separate; border-spacing: 8px 0; margin: 15px -8px 0; table-layout: fixed; } .metrics td { border: 0; }
+        .metric { padding: 10px; background: #eef5f8; border-radius: 5px; vertical-align: top; }
         .metric .value { display: block; margin-top: 4px; font-size: 14px; font-weight: bold; white-space: nowrap; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         th, td { padding: 6px 5px; border-bottom: 1px solid #dce5ee; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
@@ -38,20 +38,20 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <img class="logo" src="{{ $logo }}" alt="Mubarak Boardinghouse">
-        <div class="period"><strong>{{ $selectedProperty }}</strong><br>{{ \Illuminate\Support\Carbon::parse($filters['month'].'-01')->format('F Y') }}<br><span class="muted">Generated {{ today()->format('d M Y') }}</span></div>
-    </div>
+    <table class="header"><tr>
+        <td><img class="logo" src="{{ $logo }}" alt="Mubarak Boardinghouse"></td>
+        <td class="period"><strong>{{ $selectedProperty }}</strong><br>{{ \Illuminate\Support\Carbon::parse($filters['month'].'-01')->format('F Y') }}<br><span class="muted">Generated {{ today()->format('d M Y') }}</span></td>
+    </tr></table>
     <h1>Management reports</h1>
     <div class="muted">Billings are accrual charges. Collections are approved cash receipts. Aging is based on unpaid ledger charges.</div>
 
-    <div class="metrics">
-        <div class="metric">Billed in month<span class="value">{{ Money::format($monthly['billed_cents']) }}</span></div>
-        <div class="metric">Collected in month<span class="value">{{ Money::format($monthly['collected_cents']) }}</span></div>
-        <div class="metric">Current net receivable<span class="value">{{ Money::format($aging['net_receivable_cents']) }}</span></div>
-        <div class="metric">Security deposits held<span class="value">{{ Money::format($depositsHeldCents) }}</span></div>
-        <div class="metric">Unpaid opening balances<span class="value">{{ Money::format($unpaidOpeningsCents) }}</span></div>
-    </div>
+    <table class="metrics"><tr>
+        <td class="metric">Billed in month<span class="value">{{ Money::format($monthly['billed_cents']) }}</span></td>
+        <td class="metric">Collected in month<span class="value">{{ Money::format($monthly['collected_cents']) }}</span></td>
+        <td class="metric">Current net receivable<span class="value">{{ Money::format($aging['net_receivable_cents']) }}</span></td>
+        <td class="metric">Security deposits held<span class="value">{{ Money::format($depositsHeldCents) }}</span></td>
+        <td class="metric">Unpaid opening balances<span class="value">{{ Money::format($unpaidOpeningsCents) }}</span></td>
+    </tr></table>
 
     <h2>Property summary</h2>
     <table>

@@ -20,7 +20,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Payments against a billing account. An approved payment posts exactly ONE negative `payment` ledger entry;
  * allocations only record which debts it settles and never touch the ledger, so nothing is subtracted twice.
- * Callers authorize (owner approves, reverses, refunds, writes off; staff only record).
+ * Callers authorize (owner approves, reverses, refunds; staff only record). Write-off was removed; write-offs already
+ * in the ledger (if any) still count when working out what is owed.
  */
 class PaymentService
 {
@@ -165,25 +166,6 @@ class PaymentService
 
             $entry = $this->ledger->post($account, LedgerEntryType::Refund, $cents, today(), $account, $reason);
             Audit::log('payment.refunded', $account, ['amount_cents' => $cents, 'reason' => $reason, 'ledger_entry_id' => $entry->id]);
-
-            return $entry;
-        });
-    }
-
-    /** Forgives part or all of one debt; the negative `writeoff` entry is tied to that debt. */
-    public function writeOff(LedgerEntry $debit, int $cents, string $reason): LedgerEntry
-    {
-        return DB::transaction(function () use ($debit, $cents, $reason) {
-            $this->lockAccount($debit->billing_account_id);
-            if ($cents <= 0) {
-                throw ValidationException::withMessages(['amount' => 'The write-off must be more than zero.']);
-            }
-            if ($cents > $this->remaining($debit)) {
-                throw ValidationException::withMessages(['amount' => 'You can write off at most what is still unpaid on this charge.']);
-            }
-
-            $entry = $this->ledger->post($debit->billingAccount, LedgerEntryType::Writeoff, -$cents, today(), $debit, $reason);
-            Audit::log('payment.written_off', $debit, ['amount_cents' => $cents, 'reason' => $reason, 'ledger_entry_id' => $entry->id]);
 
             return $entry;
         });

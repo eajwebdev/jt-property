@@ -1,4 +1,4 @@
-import { RefundDialog, WriteOffDialog, type DebitOption } from '@/components/account-money-dialogs';
+import { RefundDialog } from '@/components/account-money-dialogs';
 import { PageHeader } from '@/components/page-header';
 import { RecordPaymentDialog } from '@/components/record-payment-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -24,7 +24,6 @@ interface Row {
     balance: string;
     is_credit: boolean;
     oldest_due: string | null;
-    debits: DebitOption[];
     aging: string | null;
 }
 interface Props {
@@ -62,7 +61,6 @@ export default function CollectionsIndex({ rows, properties, filters, canRecord,
     const { flash, auth } = usePage<SharedData>().props;
     const [paying, setPaying] = useState<{ open: boolean; accountId: number | null }>({ open: false, accountId: null });
     const [refunding, setRefunding] = useState<Row | null>(null);
-    const [writingOff, setWritingOff] = useState<Row | null>(null);
     const isOwner = (auth.user as { role?: string }).role === 'owner';
 
     const go = (next: Partial<{ status: string; property_id: string }>) =>
@@ -161,18 +159,11 @@ export default function CollectionsIndex({ rows, properties, filters, canRecord,
                                     <Link className="block text-center text-sm underline" href={route('accounts.statement', r.account_id)}>
                                         Account statement
                                     </Link>
-                                    {canManage && (
+                                    {canManage && r.is_credit && (
                                         <div className="flex gap-2">
-                                            {r.is_credit && (
-                                                <Button variant="ghost" className="h-11 flex-1" onClick={() => setRefunding(r)}>
-                                                    Refund
-                                                </Button>
-                                            )}
-                                            {r.debits.length > 0 && (
-                                                <Button variant="ghost" className="h-11 flex-1" onClick={() => setWritingOff(r)}>
-                                                    Write off
-                                                </Button>
-                                            )}
+                                            <Button variant="ghost" className="h-11 flex-1" onClick={() => setRefunding(r)}>
+                                                Refund
+                                            </Button>
                                         </div>
                                     )}
                                 </li>
@@ -232,11 +223,6 @@ export default function CollectionsIndex({ rows, properties, filters, canRecord,
                                                             Refund
                                                         </Button>
                                                     )}
-                                                    {canManage && r.debits.length > 0 && (
-                                                        <Button size="sm" variant="ghost" onClick={() => setWritingOff(r)}>
-                                                            Write off
-                                                        </Button>
-                                                    )}
                                                 </td>
                                             )}
                                         </tr>
@@ -256,9 +242,6 @@ export default function CollectionsIndex({ rows, properties, filters, canRecord,
                     tenant={refunding.tenant}
                     credit={refunding.balance}
                 />
-            )}
-            {writingOff && (
-                <WriteOffDialog open onOpenChange={(o) => !o && setWritingOff(null)} tenant={writingOff.tenant} debits={writingOff.debits} />
             )}
             <RecordPaymentDialog
                 open={paying.open}

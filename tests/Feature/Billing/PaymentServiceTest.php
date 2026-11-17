@@ -281,26 +281,10 @@ class PaymentServiceTest extends TestCase
         $this->assertSame(50000, LedgerEntry::where('type', LedgerEntryType::Refund)->value('amount_cents'));
     }
 
-    public function test_write_off_reduces_the_debit_and_cannot_exceed_it(): void
+    public function test_debts_can_no_longer_be_written_off(): void
     {
-        $opening = $this->opening(100000);
-
-        $this->service->writeOff($opening, 40000, 'Uncollectible');
-
-        $this->assertSame(60000, $this->service->remaining($opening));
-        $this->assertSame(60000, $this->ledger->balance($this->account));
-        $this->assertSame(-40000, LedgerEntry::where('type', LedgerEntryType::Writeoff)->value('amount_cents'));
-
-        $this->expectException(ValidationException::class);
-        $this->service->writeOff($opening, 60001, 'Too much');
-    }
-
-    public function test_write_off_of_an_invoice_charge_marks_it_paid(): void
-    {
-        [$invoice, $charge] = $this->invoice(100000);
-        $this->service->writeOff($charge, 100000, 'Forgiven');
-
-        $this->assertSame('paid', app(InvoiceStatusService::class)->statusFor($invoice));
+        // Write-off was removed: a debt is settled only by payments, credits or a bill correction.
+        $this->assertFalse(method_exists($this->service, 'writeOff'));
     }
 
     public function test_future_dated_payment_is_rejected(): void
@@ -375,11 +359,12 @@ class PaymentServiceTest extends TestCase
         $this->assertSame('approved', $again->status);
     }
 
-    public function test_written_off_amount_is_reported_for_the_invoice(): void
+    public function test_a_write_off_already_in_the_ledger_still_counts(): void
     {
+        // Ledger entries are permanent: any write-off made before the feature was removed keeps settling its debt.
         [$invoice, $charge] = $this->invoice(100000);
         $this->pay(60000);
-        $this->service->writeOff($charge, 40000, 'Forgiven');
+        $this->ledger->post($this->account, LedgerEntryType::Writeoff, -40000, today(), $charge, 'Forgiven before removal');
 
         $statuses = app(InvoiceStatusService::class);
         $this->assertSame('paid', $statuses->statusFor($invoice));

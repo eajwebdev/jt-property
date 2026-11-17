@@ -13,6 +13,7 @@ use App\Services\Billing\ReceivableLedgerService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -82,7 +83,7 @@ class PaymentHttpTest extends TestCase
         $this->assertSame(0, Payment::count());
     }
 
-    public function test_only_owner_approves_reverses_refunds_and_writes_off(): void
+    public function test_only_owner_approves_reverses_and_refunds_and_write_off_is_gone(): void
     {
         $payment = app(PaymentService::class)->record($this->account, ['amount_cents' => 1000, 'paid_on' => '2026-11-16', 'method' => 'cash'], $this->staff());
         $debit = LedgerEntry::where('type', LedgerEntryType::Opening)->first();
@@ -91,7 +92,8 @@ class PaymentHttpTest extends TestCase
         $this->post(route('payments.approve', $payment))->assertForbidden();
         $this->post(route('payments.reverse', $payment), ['reason' => 'x'])->assertForbidden();
         $this->post(route('accounts.refunds.store', $this->account), ['amount' => '1', 'reason' => 'x'])->assertForbidden();
-        $this->post(route('ledger-entries.write-off', $debit), ['amount' => '1', 'reason' => 'x'])->assertForbidden();
+        $this->assertFalse(Route::has('ledger-entries.write-off'));
+        $this->post('/ledger-entries/'.$debit->id.'/write-off', ['amount' => '1', 'reason' => 'x'])->assertNotFound();
 
         $this->actingAs($this->owner)->post(route('payments.approve', $payment))->assertRedirect();
         $this->assertSame('approved', $payment->fresh()->status);
@@ -99,11 +101,10 @@ class PaymentHttpTest extends TestCase
         $this->assertSame('reversed', $payment->fresh()->status);
     }
 
-    public function test_write_off_and_refund_over_http(): void
+    public function test_refund_over_http(): void
     {
-        $debit = LedgerEntry::where('type', LedgerEntryType::Opening)->first();
-        $this->post(route('ledger-entries.write-off', $debit), ['amount' => '1,800', 'reason' => 'Forgiven'])->assertRedirect();
-        $this->post(route('accounts.payments.store', $this->account), $this->payload())->assertRedirect();
+        // Owes ₱1,800; pays ₱2,300, so ₱500 is credit that can be refunded.
+        $this->post(route('accounts.payments.store', $this->account), $this->payload(['amount' => '2,300']))->assertRedirect();
         $this->post(route('accounts.refunds.store', $this->account), ['amount' => '500', 'reason' => 'Moved out'])->assertRedirect();
 
         $this->assertSame(0, app(ReceivableLedgerService::class)->balance($this->account));
@@ -153,10 +154,10 @@ class PaymentHttpTest extends TestCase
         $this->get(route('collections.index', ['status' => 'overdue']))->assertInertia(fn (Assert $p) => $p->has('rows', 1));
     }
 
-    public function test_collections_rows_carry_open_debits_for_write_off(): void
+    public function test_collections_rows_no_longer_carry_debits_for_write_off(): void
     {
         $this->get(route('collections.index'))->assertInertia(fn (Assert $p) => $p
-            ->where('rows.0.debits.0.remaining_cents', 180000)
+            ->missing('rows.0.debits')
             ->where('canManage', true)
         );
     }

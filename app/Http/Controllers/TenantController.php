@@ -7,16 +7,21 @@ use App\Enums\RentMode;
 use App\Enums\Role;
 use App\Http\Requests\StoreTenantRequest;
 use App\Http\Requests\UpdateTenantRequest;
+use App\Models\Bed;
 use App\Models\ChargeCategory;
+use App\Models\LedgerEntry;
 use App\Models\Occupancy;
+use App\Models\Payment;
 use App\Models\Property;
 use App\Models\RentalAgreement;
 use App\Models\Tenant;
 use App\Models\Unit;
+use App\Services\TenancyService;
 use App\Support\Audit;
 use App\Support\Money;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -112,18 +117,41 @@ class TenantController extends Controller
         return redirect()->route('tenants.index', ['create' => 1]);
     }
 
-    public function store(StoreTenantRequest $request): RedirectResponse
+    /**
+     * Adds the tenant and, when a room was chosen, starts their rental in the same step (one transaction: if the room
+     * is refused, e.g. the bed was just taken, the tenant is not saved either).
+     */
+    public function store(StoreTenantRequest $request, TenancyService $tenancy): RedirectResponse
     {
         Gate::authorize('create', [Tenant::class, $request->integer('property_id')]);
+        if ($request->movesIn()) {
+            Gate::authorize('create', RentalAgreement::class);
+        }
 
-        $tenant = DB::transaction(function () use ($request) {
+        [$tenant, $agreement] = DB::transaction(function () use ($request, $tenancy) {
             $tenant = Tenant::create($request->safe()->only(self::FIELDS));
             Audit::log('tenant.created', $tenant, ['new' => $tenant->only(['full_name', 'property_id'])]);
+            if (! $request->movesIn()) {
+                return [$tenant, null];
+            }
 
-            return $tenant;
+            $data = $request->validated();
+            $agreement = $tenancy->startAgreement(
+                $tenant,
+                Unit::findOrFail($data['unit_id']),
+                isset($data['bed_id']) ? Bed::findOrFail($data['bed_id']) : null,
+                $request->rentCents(),
+                (int) $data['due_day'],
+                Carbon::parse($data['start_date']),
+                ['deposit_cents' => $request->depositCents()],
+            );
+
+            return [$tenant, $agreement];
         });
 
-        return redirect()->route('tenants.show', $tenant)->with('success', "{$tenant->full_name} was added.");
+        $where = $agreement ? ' and moved into '.$agreement->unit->label.($agreement->bed ? ' / '.$agreement->bed->label : '') : '';
+
+        return redirect()->route('tenants.show', $tenant)->with('success', "{$tenant->full_name} was added{$where}.");
     }
 
     public function show(Tenant $tenant): Response
@@ -193,6 +221,25 @@ class TenantController extends Controller
                 'open' => $o->move_out_date === null || $o->move_out_date->toDateString() >= $today,
             ]);
 
+        // Every payment the tenant made (all their accounts), newest first, each with its receipt.
+        $accountNos = $tenant->billingAccounts()->pluck('account_no', 'id');
+        $payments = Payment::whereIn('billing_account_id', $accountNos->keys())
+            ->orderByDesc('paid_on')->orderByDesc('id')
+            ->get(['id', 'billing_account_id', 'amount_cents', 'paid_on', 'method', 'reference', 'status', 'ack_number'])
+            ->map(fn (Payment $p) => [
+                'id' => $p->id,
+                'receipt_number' => $p->ack_number,
+                'paid_on' => $p->paid_on->toDateString(),
+                'amount_cents' => $p->amount_cents,
+                'amount' => Money::format($p->amount_cents),
+                'method' => $p->method,
+                'reference' => $p->reference,
+                'status' => $p->status,
+                'account_id' => $p->billing_account_id,
+                'account_no' => $accountNos[$p->billing_account_id] ?? null,
+            ]);
+        $balances = $accountNos->keys()->mapWithKeys(fn ($id) => [$id => (int) LedgerEntry::where('billing_account_id', $id)->sum('amount_cents')]);
+
         $user = request()->user();
         $canStartRental = $user->can('create', RentalAgreement::class) && $tenant->archived_at === null && $tenant->property->archived_at === null;
 
@@ -203,6 +250,9 @@ class TenantController extends Controller
             ),
             'accounts' => $accounts,
             'occupancies' => $occupancies,
+            'payments' => $payments,
+            'balances' => $accountNos->map(fn ($no, $id) => ['account_id' => $id, 'account_no' => $no, 'balance_cents' => $balances[$id]])->values(),
+            'canRecordPayment' => $user->can('create', [Payment::class, $tenant->property_id]),
             'canEdit' => $user->can('update', $tenant),
             'form' => $user->can('update', $tenant) ? $this->formProps(request(), $tenant) : null,
             'canArchive' => $user->can('archive', $tenant) && $tenant->archived_at === null,
@@ -329,6 +379,46 @@ class TenantController extends Controller
             'propertyLocked' => $tenant && ($tenant->occupancies()->exists() || $tenant->billingAccounts()->exists()),
             'properties' => $this->accessibleProperties($request)->get(['properties.id', 'properties.name']),
             'deliveryMethods' => collect(DeliveryMethod::cases())->map->value,
+            // New tenant only, and only for whoever may start rentals: where they can move in right away.
+            'rooms' => $tenant === null && $request->user()->can('create', RentalAgreement::class)
+                ? $this->rooms($this->accessibleProperties($request)->pluck('properties.id')->all())
+                : [],
+            'today' => today()->toDateString(),
         ];
+    }
+
+    /**
+     * Rooms of these properties with building, floor, how full they are and their free beds, for choosing where a
+     * new tenant moves in. Only a convenience list: TenancyService re-checks every rule when saving.
+     *
+     * @param  list<int>  $propertyIds
+     * @return list<array<string, mixed>>
+     */
+    private function rooms(array $propertyIds): array
+    {
+        $today = today()->toDateString();
+        $takenBeds = RentalAgreement::query()->currentOrFuture()->whereNotNull('bed_id')
+            ->whereHas('unit', fn ($q) => $q->whereIn('property_id', $propertyIds))->pluck('bed_id')->flip();
+
+        return Unit::query()
+            ->whereIn('property_id', $propertyIds)
+            ->whereHas('property', fn ($q) => $q->whereNull('archived_at'))
+            ->with(['beds' => fn ($q) => $q->orderBy('id')])
+            ->withCount(['occupancies as occupied' => fn ($q) => $q->activeOn($today)])
+            ->orderBy('property_id')->orderBy('building')->orderByRaw('LENGTH(code)')->orderBy('code')
+            ->get()
+            ->map(fn (Unit $unit) => [
+                'unit_id' => $unit->id,
+                'property_id' => $unit->property_id,
+                'building' => $unit->building,
+                'floor' => $unit->floor,
+                'code' => $unit->code,
+                'per_bed' => $unit->rent_mode === RentMode::PerBed,
+                'capacity' => $unit->capacity,
+                'occupied' => $unit->occupied,
+                'beds' => $unit->rent_mode === RentMode::PerBed
+                    ? $unit->beds->reject(fn ($bed) => $takenBeds->has($bed->id))->map(fn ($bed) => ['id' => $bed->id, 'label' => $bed->label])->values()->all()
+                    : [],
+            ])->values()->all();
     }
 }

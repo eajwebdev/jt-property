@@ -8,6 +8,7 @@ use App\Models\BillingAccount;
 use App\Models\Invoice;
 use App\Models\LedgerEntry;
 use App\Models\OpeningBalance;
+use App\Models\Payment;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
@@ -148,11 +149,18 @@ class StatementComposer
     /** @return array{date:string,type:string,memo:?string,amount_cents:int} */
     private function row(LedgerEntry $e): array
     {
+        // A payment line points at its receipt.
+        $payment = $e->type === LedgerEntryType::Payment && $e->source_type === (new Payment)->getMorphClass()
+            ? Payment::find($e->source_id, ['id', 'ack_number'])
+            : null;
+
         return [
             'date' => $e->effective_date->toDateString(),
             'type' => $e->type->value,
             'memo' => $e->memo,
             'amount_cents' => $e->amount_cents,
+            'payment_id' => $payment?->id,
+            'receipt_number' => $payment?->ack_number,
         ];
     }
 }

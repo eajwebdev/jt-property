@@ -4,13 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\BillingAccount;
 use App\Services\Billing\StatementComposer;
+use App\Support\PdfDocument;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\View;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\LaravelPdf\Facades\Pdf;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AccountStatementController extends Controller
 {
@@ -28,16 +29,16 @@ class AccountStatementController extends Controller
         ]);
     }
 
-    public function download(Request $request, BillingAccount $account, StatementComposer $composer): StreamedResponse
+    public function download(Request $request, BillingAccount $account, StatementComposer $composer): SymfonyResponse
     {
         abort_unless($request->user()->canAccessProperty($account->property_id), 403);
         [$from, $to] = $this->dates($request);
         $account->load(['payer:id,full_name', 'property:id,name']);
         $statement = $composer->forPeriod($account, Carbon::parse($from), Carbon::parse($to));
         $html = View::make('pdf.account-statement', compact('account', 'statement'))->render();
-        $bytes = Pdf::html($html)->format('a4')->margins(12, 12, 12, 12)->withBrowsershot(fn ($browser) => $browser->showBackground())->generatePdfContent();
 
-        return response()->streamDownload(fn () => print ($bytes), $account->account_no.'-'.$from.'-'.$to.'.pdf', ['Content-Type' => 'application/pdf'], 'inline');
+        return PdfDocument::respond($html, $account->account_no.'-'.$from.'-'.$to.'.pdf',
+            fn () => Pdf::html($html)->format('a4')->margins(12, 12, 12, 12)->withBrowsershot(fn ($browser) => $browser->showBackground())->generatePdfContent());
     }
 
     /** @return array{string,string} */

@@ -16,12 +16,14 @@ use App\Models\Unit;
 use App\Services\Billing\AgingReportService;
 use App\Services\Billing\PaymentService;
 use App\Services\Billing\StatementOfAccountsReport;
+use App\Support\PdfDocument;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\View;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\LaravelPdf\Facades\Pdf;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportsController extends Controller
@@ -31,18 +33,17 @@ class ReportsController extends Controller
         return Inertia::render('reports/index', $this->reportData($request, $aging, $payments));
     }
 
-    public function pdf(Request $request, AgingReportService $aging, PaymentService $payments): StreamedResponse
+    public function pdf(Request $request, AgingReportService $aging, PaymentService $payments): SymfonyResponse
     {
         $data = $this->reportData($request, $aging, $payments);
         $html = View::make('pdf.reports', $data)->render();
-        $bytes = Pdf::html($html)->format('a4')->landscape()->margins(12, 12, 12, 12)
-            ->withBrowsershot(fn ($browser) => $browser->showBackground())->generatePdfContent();
 
-        return response()->streamDownload(fn () => print ($bytes), 'reports-'.$data['filters']['month'].'.pdf', ['Content-Type' => 'application/pdf'], 'inline');
+        return PdfDocument::respond($html, 'reports-'.$data['filters']['month'].'.pdf', fn () => Pdf::html($html)->format('a4')->landscape()->margins(12, 12, 12, 12)
+            ->withBrowsershot(fn ($browser) => $browser->showBackground())->generatePdfContent(), 'A4 landscape', '12mm');
     }
 
     /** All boarders on one sheet, printed on long bond paper (8.5" × 13") in landscape. One property per page set. */
-    public function statementOfAccounts(Request $request, StatementOfAccountsReport $report): StreamedResponse
+    public function statementOfAccounts(Request $request, StatementOfAccountsReport $report): SymfonyResponse
     {
         // as_of: the date the sheet is "as of" (e.g. 2026-10-05). Left empty, each property uses its latest bill's due date.
         $data = $request->validate(['property_id' => ['nullable', 'integer'], 'as_of' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today']]);
@@ -60,11 +61,11 @@ class ReportsController extends Controller
         $reports = $properties->map(fn (Property $property) => $report->build($property, $asOf));
         $html = View::make('pdf.statement-of-accounts', ['reports' => $reports])->render();
         $footer = '<div style="width:100%; font:7.5pt Arial,sans-serif; text-align:center;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>';
-        $bytes = Pdf::html($html)->paperSize(330.2, 215.9, 'mm')->margins(10, 10, 12, 10)->footerHtml($footer)
-            ->withBrowsershot(fn ($browser) => $browser->showBackground())->generatePdfContent();
         $name = 'statement-of-accounts-'.($properties->count() === 1 ? $properties->first()->code.'-' : '').$reports->first()['as_of']->format('Y-m-d').'.pdf';
 
-        return response()->streamDownload(fn () => print ($bytes), $name, ['Content-Type' => 'application/pdf'], 'inline');
+        // Long bond paper (8.5" x 13"), landscape.
+        return PdfDocument::respond($html, $name, fn () => PdfDocument::builder($html, $footer)->paperSize(330.2, 215.9, 'mm')->margins(10, 10, 12, 10)
+            ->withBrowsershot(fn ($browser) => $browser->showBackground())->generatePdfContent(), '330.2mm 215.9mm', '10mm 10mm 12mm 10mm');
     }
 
     /** @return array<string, mixed> */

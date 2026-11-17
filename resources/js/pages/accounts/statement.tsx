@@ -9,7 +9,7 @@ import { formatDate } from '@/lib/tenant-labels';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { FileDown, Scale, ScrollText, Search } from 'lucide-react';
+import { FileDown, Printer, Scale, ScrollText, Search } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 interface Props {
@@ -19,7 +19,16 @@ interface Props {
     statement: {
         opening_cents: number;
         closing_cents: number;
-        rows: { date: string; type: string; memo: string | null; amount_cents: number; balance_cents: number }[];
+        rows: {
+            date: string;
+            type: string;
+            memo: string | null;
+            amount_cents: number;
+            balance_cents: number;
+            /** Payment lines: the payment and its receipt number. */
+            payment_id?: number | null;
+            receipt_number?: string | null;
+        }[];
     };
 }
 
@@ -41,7 +50,7 @@ export default function AccountStatement({ account, from, to, statement }: Props
             <div className="mx-auto w-full max-w-5xl space-y-6 p-4 md:p-6">
                 <PageHeader
                     icon={ScrollText}
-                    title="Account statement"
+                    title="Account ledger"
                     description={`${account.tenant} · ${account.number} · ${account.property}`}
                     actions={
                         <Button asChild variant="outline">
@@ -109,6 +118,16 @@ export default function AccountStatement({ account, from, to, statement }: Props
                                     <td className="px-4 py-3">
                                         <span className="capitalize">{row.type}</span>
                                         {row.memo && <span className="text-muted-foreground"> — {row.memo}</span>}
+                                        {row.payment_id && row.receipt_number && (
+                                            <a
+                                                href={route('payments.acknowledgment', row.payment_id)}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-primary ml-2 inline-flex items-center gap-1 text-xs font-medium hover:underline"
+                                            >
+                                                <Printer className="size-3" aria-hidden /> Receipt {row.receipt_number}
+                                            </a>
+                                        )}
                                     </td>
                                     <td className={cn('px-4 py-3 text-right font-mono', row.amount_cents < 0 ? 'text-success' : '')}>
                                         {formatCents(row.amount_cents)}

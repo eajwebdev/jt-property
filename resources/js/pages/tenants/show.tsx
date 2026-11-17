@@ -3,6 +3,7 @@ import { PageHeader } from '@/components/page-header';
 import { AddRecurringChargeDialog, type Category } from '@/components/recurring-charge-dialog';
 import StartRentalDialog, { type RentalOptions } from '@/components/start-rental-dialog';
 import TenantFormDialog, { type TenantFormData } from '@/components/tenant-form-dialog';
+import { TenantPayments, type AccountBalance, type TenantPayment } from '@/components/tenant-payments';
 import TenantStatusBadge, { NoEmailBadge } from '@/components/tenant-status-badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -76,6 +77,8 @@ interface Props {
         replaced: boolean;
         open: boolean;
     }[];
+    payments: TenantPayment[];
+    balances: AccountBalance[];
     canEdit: boolean;
     form: TenantFormData | null;
     canArchive: boolean;
@@ -101,6 +104,8 @@ export default function Show({
     tenant,
     accounts,
     occupancies,
+    payments,
+    balances,
     canEdit,
     form,
     canArchive,
@@ -221,7 +226,7 @@ export default function Show({
                                     {account.agreements.map((a) => (
                                         <div key={a.id} className="surface space-y-2 p-3">
                                             <div className="flex flex-wrap items-center justify-between gap-2">
-                                                <p className="font-medium">Room {a.room}</p>
+                                                <p className="font-medium">{a.room}</p>
                                                 <Badge variant="outline">{agreementStatusLabels[a.status] ?? a.status}</Badge>
                                             </div>
                                             <p className="text-muted-foreground text-sm">
@@ -329,6 +334,8 @@ export default function Show({
                     )}
                 </section>
 
+                <TenantPayments payments={payments} balances={balances} />
+
                 <section aria-labelledby="stays" className="space-y-3">
                     <h2 id="stays" className="text-lg font-semibold">
                         Rooms lived in
@@ -340,7 +347,7 @@ export default function Show({
                             {occupancies.map((o) => (
                                 <li key={o.id} className="flex flex-wrap justify-between gap-2 p-3 text-sm">
                                     <span className="font-medium">
-                                        Room {o.room}
+                                        {o.room}
                                         {o.is_payer && <span className="text-muted-foreground font-normal"> (pays the rent)</span>}
                                     </span>
                                     <span className="text-muted-foreground">

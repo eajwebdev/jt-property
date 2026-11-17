@@ -3,9 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { SearchSelect } from '@/components/ui/search-select';
 import { useForm } from '@inertiajs/react';
-import { FormEventHandler, useState } from 'react';
+import { FormEventHandler } from 'react';
 
 export interface DebitOption {
     id: number;
@@ -60,66 +59,6 @@ export function RefundDialog({ open, onOpenChange, accountId, tenant, credit }: 
                         </Button>
                         <Button variant="destructive" disabled={form.processing || !form.data.amount.trim() || !form.data.reason.trim()}>
                             Confirm refund
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-/** Owner-only: forgive part or all of one unpaid charge. */
-export function WriteOffDialog({ open, onOpenChange, tenant, debits }: Base & { tenant: string; debits: DebitOption[] }) {
-    const [entryId, setEntryId] = useState<number | null>(null);
-    const form = useForm({ amount: '', reason: '' });
-    const errors = form.errors as Record<string, string | undefined>;
-    const chosen = entryId ?? debits[0]?.id ?? null;
-    const submit: FormEventHandler = (e) => {
-        e.preventDefault();
-        if (chosen)
-            form.post(route('ledger-entries.write-off', chosen), { preserveScroll: true, onSuccess: () => (form.reset(), onOpenChange(false)) });
-    };
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
-                <form onSubmit={submit} className="space-y-4">
-                    <DialogHeader>
-                        <DialogTitle>Write off a debt of {tenant}</DialogTitle>
-                        <DialogDescription>
-                            The tenant no longer owes the amount you write off. It is recorded in the ledger with your reason.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-2">
-                        <Label htmlFor="wo-debit">Which charge</Label>
-                        <SearchSelect
-                            id="wo-debit"
-                            value={String(chosen ?? '')}
-                            onChange={(v) => setEntryId(Number(v))}
-                            options={debits.map((d) => ({ value: String(d.id), label: d.label, hint: `still owes ${d.remaining}` }))}
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="wo-amount">Amount to write off (pesos)</Label>
-                        <Input
-                            id="wo-amount"
-                            inputMode="decimal"
-                            value={form.data.amount}
-                            onChange={(e) => form.setData('amount', e.target.value)}
-                            required
-                        />
-                        <InputError message={errors.amount} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="wo-reason">Reason</Label>
-                        <Input id="wo-reason" value={form.data.reason} onChange={(e) => form.setData('reason', e.target.value)} required />
-                        <InputError message={errors.reason} />
-                    </div>
-                    <DialogFooter className="gap-2">
-                        <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-                            Cancel
-                        </Button>
-                        <Button variant="destructive" disabled={form.processing || !chosen || !form.data.amount.trim() || !form.data.reason.trim()}>
-                            Confirm write-off
                         </Button>
                     </DialogFooter>
                 </form>

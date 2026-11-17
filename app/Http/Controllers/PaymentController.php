@@ -3,12 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\BillingAccount;
-use App\Models\LedgerEntry;
 use App\Models\Payment;
 use App\Rules\Pesos;
 use App\Services\Billing\PaymentAcknowledgmentService;
 use App\Services\Billing\PaymentService;
 use App\Support\Money;
+use App\Support\PdfDocument;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -54,8 +54,8 @@ class PaymentController extends Controller
         }
 
         return redirect()->route('payments.show', $payment)->with('success', $payment->status === 'approved'
-            ? Money::format($payment->amount_cents).' payment recorded. Acknowledgment '.$payment->ack_number.'.'
-            : 'Payment saved. It counts once the owner approves it.');
+            ? Money::format($payment->amount_cents).' payment recorded. Receipt '.$payment->ack_number.' is ready: print it or give it to the boarder.'
+            : 'Payment saved. It counts, and its receipt is issued, once the owner approves it.');
     }
 
     /** What an amount would settle, oldest first; the modal shows this before saving. */
@@ -138,14 +138,12 @@ class PaymentController extends Controller
         return Storage::disk('local')->download($payment->proof_path);
     }
 
-    public function acknowledgment(Payment $payment, PaymentAcknowledgmentService $documents): StreamedResponse
+    public function acknowledgment(Payment $payment, PaymentAcknowledgmentService $documents): \Symfony\Component\HttpFoundation\Response
     {
         Gate::authorize('view', $payment);
         abort_if($payment->ack_number === null, 404);
 
-        $bytes = $documents->pdf($payment);
-
-        return response()->streamDownload(fn () => print ($bytes), $payment->ack_number.'.pdf', ['Content-Type' => 'application/pdf'], 'inline');
+        return PdfDocument::respond($documents->html($payment), $payment->ack_number.'.pdf', fn () => $documents->pdf($payment));
     }
 
     public function approve(Payment $payment): RedirectResponse
@@ -154,7 +152,7 @@ class PaymentController extends Controller
 
         $payment = $this->service->approve($payment, request()->user());
 
-        return back()->with('success', 'Payment approved. Acknowledgment '.$payment->ack_number.'.');
+        return back()->with('success', 'Payment approved. Receipt '.$payment->ack_number.' is ready to print.');
     }
 
     public function reverse(Request $request, Payment $payment): RedirectResponse
@@ -188,15 +186,5 @@ class PaymentController extends Controller
         $this->service->refund($account, Money::toCents($data['amount']), trim($data['reason']));
 
         return back()->with('success', 'Refund recorded.');
-    }
-
-    public function writeOff(Request $request, LedgerEntry $entry): RedirectResponse
-    {
-        Gate::authorize('writeOff', Payment::class);
-
-        $data = $request->validate(['amount' => ['required', 'string', new Pesos('write-off')], 'reason' => ['required', 'string', 'max:1000']]);
-        $this->service->writeOff($entry, Money::toCents($data['amount']), trim($data['reason']));
-
-        return back()->with('success', 'Written off.');
     }
 }

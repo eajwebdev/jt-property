@@ -6,12 +6,12 @@ use App\Models\Invoice;
 use App\Models\StatementSnapshot;
 use App\Models\User;
 use App\Support\Audit;
+use App\Support\PdfDocument;
 use App\Support\StatementSettings;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\View;
-use Spatie\LaravelPdf\Facades\Pdf;
 
 /**
  * Renders the A4 statement. The first render freezes the numbers and the file in a statement_snapshot;
@@ -83,8 +83,7 @@ class StatementPdfService
 
     private function pdf(Statement $statement): string
     {
-        return Pdf::html($this->renderHtml($statement, false))
-            ->footerHtml(View::make('pdf.statement-footer', ['s' => $statement])->render())
+        return PdfDocument::builder($this->renderHtml($statement, false), View::make('pdf.statement-footer', ['s' => $statement])->render())
             ->format('a4')
             ->margins(8, 0, 16, 0)
             ->withBrowsershot(fn ($b) => $b->showBackground()->preferCssPageSize(false))

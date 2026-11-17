@@ -59,12 +59,6 @@ class CollectionsController extends Controller
                 'balance_cents' => $balance,
                 'balance' => Money::format(abs($balance)),
                 'is_credit' => $balance < 0,
-                'debits' => $open->map(fn ($d) => [
-                    'id' => $d->id,
-                    'label' => ($d->memo ?: ucfirst($d->type->value)).' due '.Carbon::parse($d->due_date)->format('M j, Y'),
-                    'remaining_cents' => $d->remaining_cents,
-                    'remaining' => Money::format($d->remaining_cents),
-                ])->values(),
                 'oldest_due' => $oldest,
                 'aging' => $oldest === null ? null : $this->bucket($days),
                 'flags' => [

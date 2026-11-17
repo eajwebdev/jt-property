@@ -11,13 +11,14 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/tenant-labels';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { HandCoins, Wallet } from 'lucide-react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { BookOpen, HandCoins, Printer, Wallet } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 
 interface Props {
     payment: {
         id: number;
+        account_id: number;
         account_no: string;
         tenant: string;
         property: string;
@@ -107,8 +108,8 @@ export default function PaymentShow({ payment, allocations, openDebits, canManag
                     title={<span className="font-mono">{payment.amount}</span>}
                     description={
                         payment.ack_number
-                            ? `Acknowledgment ${payment.ack_number} (not a BIR official receipt)`
-                            : 'No acknowledgment number until approved'
+                            ? `Receipt ${payment.ack_number} · ${payment.tenant} · ${payment.account_no}`
+                            : 'The receipt is issued once the owner approves this payment.'
                     }
                     actions={
                         <Badge variant={payment.status === 'approved' ? 'success' : payment.status === 'pending' ? 'warning' : 'danger'}>
@@ -117,11 +118,18 @@ export default function PaymentShow({ payment, allocations, openDebits, canManag
                     }
                 />
                 {payment.ack_number && (
-                    <Button asChild variant="outline">
-                        <a href={route('payments.acknowledgment', payment.id)} target="_blank" rel="noopener noreferrer">
-                            View payment acknowledgment PDF
-                        </a>
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                        <Button asChild size="lg">
+                            <a href={route('payments.acknowledgment', payment.id)} target="_blank" rel="noopener noreferrer">
+                                <Printer /> Print receipt {payment.ack_number}
+                            </a>
+                        </Button>
+                        <Button asChild size="lg" variant="outline">
+                            <Link href={route('accounts.statement', payment.account_id)}>
+                                <BookOpen /> {payment.tenant}&apos;s ledger
+                            </Link>
+                        </Button>
+                    </div>
                 )}
 
                 {flash?.success && (

@@ -48,9 +48,4 @@ class PaymentPolicy
     {
         return $user->isOwner();
     }
-
-    public function writeOff(User $user): bool
-    {
-        return $user->isOwner();
-    }
 }

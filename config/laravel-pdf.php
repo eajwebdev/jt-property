@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\PdfDocument;
 use Spatie\LaravelPdf\Caching\DefaultPdfCache;
 use Spatie\LaravelPdf\Encryption\DefaultPdfEncrypter;
 use Spatie\LaravelPdf\Jobs\GeneratePdfJob;
@@ -9,7 +10,8 @@ return [
      * The default driver to use for PDF generation.
      * Supported: "browsershot", "cloudflare", "dompdf", "gotenberg", "chrome"
      */
-    'driver' => env('LARAVEL_PDF_DRIVER', 'browsershot'),
+    // Browsershot (Chrome) where the server has Node; otherwise dompdf, so plain shared hosting still makes PDFs.
+    'driver' => PdfDocument::resolveDriver(env('LARAVEL_PDF_DRIVER'), env('LARAVEL_PDF_NODE_BINARY')),
 
     /*
      * Render caching. When you call `->cache()` on a PDF, the generated

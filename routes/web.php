@@ -70,7 +70,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('accounts/{account}/payments/preview', [PaymentController::class, 'preview'])->name('accounts.payments.preview');
     Route::post('accounts/{account}/payments', [PaymentController::class, 'store'])->name('accounts.payments.store');
     Route::post('accounts/{account}/refunds', [PaymentController::class, 'refund'])->name('accounts.refunds.store');
-    Route::post('ledger-entries/{entry}/write-off', [PaymentController::class, 'writeOff'])->name('ledger-entries.write-off');
     Route::get('payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
     Route::get('payments/{payment}/proof', [PaymentController::class, 'proof'])->name('payments.proof');
     Route::get('payments/{payment}/acknowledgment.pdf', [PaymentController::class, 'acknowledgment'])->name('payments.acknowledgment');
