@@ -9,7 +9,7 @@ import AppLayout from '@/layouts/app-layout';
 import { propertyTypeLabels } from '@/lib/property-labels';
 import { type BreadcrumbItem, type PropertySummary, type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { ArrowUpRight, Building2, Globe, ImageOff, MapPin, Plus } from 'lucide-react';
+import { ArrowUpRight, Building2, MapPin, Plus } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Properties', href: '/properties' }];
 
@@ -67,25 +67,6 @@ export default function Index({ properties, canManage, form }: { properties: Pro
                             return (
                                 <li key={property.id}>
                                     <article className="surface group focus-within:ring-ring hover:shadow-lift relative flex h-full flex-col gap-4 overflow-hidden p-5 transition-shadow duration-200 focus-within:ring-2">
-                                        <div className="bg-muted relative -mx-5 -mt-5 aspect-[16/9] overflow-hidden border-b">
-                                            {property.cover ? (
-                                                <img
-                                                    src={property.cover}
-                                                    alt=""
-                                                    loading="lazy"
-                                                    className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                                                />
-                                            ) : (
-                                                <div className="text-muted-foreground grid size-full place-items-center">
-                                                    <ImageOff className="size-8" aria-hidden />
-                                                </div>
-                                            )}
-                                            {property.show_on_website && (
-                                                <Badge variant="success" className="bg-card/90 absolute top-3 left-3 backdrop-blur">
-                                                    <Globe className="size-3" aria-hidden /> On website
-                                                </Badge>
-                                            )}
-                                        </div>
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0">
                                                 <h2 className="truncate text-base font-semibold">

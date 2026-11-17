@@ -53,7 +53,9 @@ export default function BillingMonths({ months, filters, properties, next, canGe
                                 aria-label="Property"
                                 className="w-52"
                                 value={String(filters.property_id ?? '')}
-                                onChange={(v) => router.get(route('billing.index'), v ? { property_id: v } : {}, { preserveState: true, replace: true })}
+                                onChange={(v) =>
+                                    router.get(route('billing.index'), v ? { property_id: v } : {}, { preserveState: true, replace: true })
+                                }
                                 options={[{ value: '', label: 'All properties' }, ...properties.map((p) => ({ value: String(p.id), label: p.name }))]}
                             />
                             {canGenerate && (
@@ -92,7 +94,10 @@ export default function BillingMonths({ months, filters, properties, next, canGe
                 ) : (
                     <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {months.map((m, i) => {
-                            const paidPct = m.billed_cents > 0 ? Math.round(((m.billed_cents - Math.min(m.unpaid_cents, m.billed_cents)) / m.billed_cents) * 100) : 100;
+                            const paidPct =
+                                m.billed_cents > 0
+                                    ? Math.round(((m.billed_cents - Math.min(m.unpaid_cents, m.billed_cents)) / m.billed_cents) * 100)
+                                    : 100;
                             const allPaid = m.unpaid_cents <= 0;
                             return (
                                 <li key={m.key}>
@@ -116,7 +121,10 @@ export default function BillingMonths({ months, filters, properties, next, canGe
                                                     {m.bills} {m.bills === 1 ? 'bill' : 'bills'} · {m.paid_bills} paid
                                                 </p>
                                             </div>
-                                            <ArrowRight className="text-muted-foreground group-hover:text-primary size-4 transition-colors" aria-hidden />
+                                            <ArrowRight
+                                                className="text-muted-foreground group-hover:text-primary size-4 transition-colors"
+                                                aria-hidden
+                                            />
                                         </div>
                                         <dl className="grid grid-cols-2 gap-2 text-sm">
                                             <div>
@@ -125,13 +133,25 @@ export default function BillingMonths({ months, filters, properties, next, canGe
                                             </div>
                                             <div>
                                                 <dt className="text-muted-foreground text-xs">Still unpaid</dt>
-                                                <dd className={cn('font-mono font-semibold tabular-nums', allPaid ? 'text-success' : 'text-destructive')}>
+                                                <dd
+                                                    className={cn(
+                                                        'font-mono font-semibold tabular-nums',
+                                                        allPaid ? 'text-success' : 'text-destructive',
+                                                    )}
+                                                >
                                                     {allPaid ? 'All paid' : formatCents(m.unpaid_cents)}
                                                 </dd>
                                             </div>
                                         </dl>
                                         <div>
-                                            <div className="bg-muted h-1.5 overflow-hidden rounded-full" role="progressbar" aria-valuenow={paidPct} aria-valuemin={0} aria-valuemax={100} aria-label="Collected">
+                                            <div
+                                                className="bg-muted h-1.5 overflow-hidden rounded-full"
+                                                role="progressbar"
+                                                aria-valuenow={paidPct}
+                                                aria-valuemin={0}
+                                                aria-valuemax={100}
+                                                aria-label="Collected"
+                                            >
                                                 <div className="bg-success h-full rounded-full" style={{ width: `${paidPct}%` }} />
                                             </div>
                                             <p className="text-muted-foreground mt-1.5 flex justify-between text-xs">

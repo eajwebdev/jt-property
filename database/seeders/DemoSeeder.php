@@ -53,7 +53,6 @@ class DemoSeeder extends Seeder
             'address' => '123 Demo Street, Barangay Sample, Demo City, Philippines (fake address)',
             'description' => 'Demo data: boarding house with bed-by-bed rooms.',
             'amenities' => 'Wifi, Water, Shared kitchen, Laundry area, CCTV',
-            'show_on_website' => true,
         ]);
         $hillside = Property::create([
             'name' => 'Hillside Demo Apartments',
@@ -62,7 +61,6 @@ class DemoSeeder extends Seeder
             'address' => '45 Sample Road, Demo Heights, Demo City, Philippines (fake address)',
             'description' => 'Demo data: apartment units rented as a whole.',
             'amenities' => 'Water, Parking, Own toilet and bath',
-            'show_on_website' => true,
         ]);
 
         User::where('role', 'staff')->orderBy('id')->first()?->properties()->syncWithoutDetaching([$riverside->id]);

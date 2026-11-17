@@ -38,12 +38,22 @@ export default function AuditLog({ logs, filters }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Audit log" />
             <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6">
-                <PageHeader icon={ScrollText} title="Audit log" description="Every change to money, tenants and settings, with who made it and when." />
+                <PageHeader
+                    icon={ScrollText}
+                    title="Audit log"
+                    description="Every change to money, tenants and settings, with who made it and when."
+                />
 
                 <form onSubmit={submit} className="surface grid gap-3 p-4 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-end">
                     <div className="grid gap-1.5">
                         <Label htmlFor="search">Action or user</Label>
-                        <Input id="search" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="e.g. payment.approved" />
+                        <Input
+                            id="search"
+                            type="search"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="e.g. payment.approved"
+                        />
                     </div>
                     <div className="grid gap-1.5">
                         <Label htmlFor="from">From</Label>
@@ -101,12 +111,18 @@ export default function AuditLog({ logs, filters }: Props) {
                                 href={link.url}
                                 preserveScroll
                                 aria-current={link.active ? 'page' : undefined}
-                                className={cn('hover:bg-muted grid h-9 min-w-9 place-items-center rounded-lg border px-3 text-sm transition-colors', link.active && 'bg-primary text-primary-foreground hover:bg-primary/90 border-transparent')}
+                                className={cn(
+                                    'hover:bg-muted grid h-9 min-w-9 place-items-center rounded-lg border px-3 text-sm transition-colors',
+                                    link.active && 'bg-primary text-primary-foreground hover:bg-primary/90 border-transparent',
+                                )}
                             >
                                 {label}
                             </Link>
                         ) : (
-                            <span key={index} className="text-muted-foreground grid h-9 min-w-9 place-items-center rounded-lg border px-3 text-sm opacity-60">
+                            <span
+                                key={index}
+                                className="text-muted-foreground grid h-9 min-w-9 place-items-center rounded-lg border px-3 text-sm opacity-60"
+                            >
                                 {label}
                             </span>
                         );

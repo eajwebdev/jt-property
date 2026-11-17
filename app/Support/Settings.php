@@ -14,7 +14,7 @@ use InvalidArgumentException;
 class Settings
 {
     public const DEFAULTS = [
-        'company_name' => 'JT Property Management',
+        'company_name' => 'Mubarak Boardinghouse',
         'company_address' => '',
         'company_phone' => '',
         'company_email' => '',

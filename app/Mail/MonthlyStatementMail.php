@@ -23,7 +23,7 @@ class MonthlyStatementMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'JT Property — '.$this->statement->periodStart->format('F Y').' Billing Statement — '.$this->statement->unitLabel,
+            subject: 'Mubarak Boardinghouse — '.$this->statement->periodStart->format('F Y').' Billing Statement — '.$this->statement->unitLabel,
         );
     }
 

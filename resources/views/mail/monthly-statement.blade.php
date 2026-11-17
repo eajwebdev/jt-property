@@ -14,4 +14,4 @@ Amount due on the attached statement: <strong>{{ Money::format($statement->total
 <p>Please use the payment instructions on the attached statement or contact the property office.</p>
 @endif
 <p>Please include your account number {{ $statement->accountNo }} or statement number {{ $statement->number }} with your payment reference.</p>
-<p>JT Property Management</p>
+<p>Mubarak Boardinghouse</p>

@@ -6,7 +6,10 @@ export function BillingTabs({ active }: { active: 'preview' | 'invoices' }) {
         <Link
             href={href}
             aria-current={active === key ? 'page' : undefined}
-            className={'inline-flex h-10 items-center rounded-md px-4 text-sm font-medium ' + (active === key ? 'bg-primary text-primary-foreground' : 'hover:bg-muted border')}
+            className={
+                'inline-flex h-10 items-center rounded-md px-4 text-sm font-medium ' +
+                (active === key ? 'bg-primary text-primary-foreground' : 'hover:bg-muted border')
+            }
         >
             {label}
         </Link>
@@ -19,7 +22,13 @@ export function BillingTabs({ active }: { active: 'preview' | 'invoices' }) {
     );
 }
 
-export const paymentStatusLabels: Record<string, string> = { paid: 'Paid', partial: 'Partly paid', unpaid: 'Unpaid', overdue: 'Overdue', void: 'Voided' };
+export const paymentStatusLabels: Record<string, string> = {
+    paid: 'Paid',
+    partial: 'Partly paid',
+    unpaid: 'Unpaid',
+    overdue: 'Overdue',
+    void: 'Voided',
+};
 export const paymentStatusVariant: Record<string, 'default' | 'secondary' | 'outline' | 'destructive'> = {
     paid: 'default',
     partial: 'secondary',

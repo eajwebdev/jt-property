@@ -268,6 +268,7 @@ class UtilitiesHttpTest extends TestCase
     public function test_the_page_lists_the_property_units_with_the_month_readings(): void
     {
         $this->metered();
+        $this->unit->update(['building' => 'Creekside House', 'floor' => '2nd floor', 'capacity' => 4]);
         $this->actingAs($staff = $this->staff());
         $this->post(route('utility-bills.store'), $this->reading());
         $other = Unit::factory()->for(Property::factory()->create())->create();
@@ -279,6 +280,9 @@ class UtilitiesHttpTest extends TestCase
             ->where('canConfigure', false)
             ->has('units', 1)
             ->where('units.0.id', $this->unit->id)
+            ->where('units.0.building', 'Creekside House')
+            ->where('units.0.floor', '2nd floor')
+            ->where('units.0.capacity', 4)
             ->where('units.0.utilities.electricity.mode', 'metered')
             ->where('units.0.utilities.electricity.bill.amount', '₱490.59'));
 

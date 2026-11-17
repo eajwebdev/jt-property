@@ -202,7 +202,8 @@ export default function PaymentShow({ payment, allocations, openDebits, canManag
                         <div className="bg-success/10 text-success flex items-start gap-2 rounded-lg p-3 text-sm">
                             <Wallet className="mt-0.5 size-4 shrink-0" aria-hidden />
                             <p>
-                                <strong>{payment.unallocated} paid in advance.</strong> It is kept as credit and deducted automatically from the next bill
+                                <strong>{payment.unallocated} paid in advance.</strong> It is kept as credit and deducted automatically from the next
+                                bill
                                 {openDebits.length > 0 ? ' (or use Allocate to apply it to an unpaid charge now).' : '. Nothing else to do.'}
                             </p>
                         </div>

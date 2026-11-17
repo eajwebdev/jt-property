@@ -30,7 +30,7 @@ class AppearanceTest extends TestCase
             ->patch('/settings/appearance', ['appearance' => 'neon'])
             ->assertSessionHasErrors('appearance');
 
-        $this->assertSame('system', $user->fresh()->appearance);
+        $this->assertSame('light', $user->fresh()->appearance);
     }
 
     public function test_guest_is_redirected_to_login(): void
@@ -42,6 +42,6 @@ class AppearanceTest extends TestCase
     {
         $this->actingAs(User::factory()->create())
             ->get('/dashboard')
-            ->assertInertia(fn (Assert $page) => $page->where('auth.user.appearance', 'system'));
+            ->assertInertia(fn (Assert $page) => $page->where('auth.user.appearance', 'light'));
     }
 }

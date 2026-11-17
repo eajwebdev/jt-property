@@ -37,7 +37,6 @@ class StorePropertyRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:5000'],
             'amenities' => ['nullable', 'string', 'max:5000'],
             'auto_send_email' => ['sometimes', 'boolean'],
-            'show_on_website' => ['sometimes', 'boolean'],
             'staff_ids' => ['sometimes', 'array'],
             'staff_ids.*' => ['integer', Rule::exists('users', 'id')->where('role', Role::Staff->value)],
         ];

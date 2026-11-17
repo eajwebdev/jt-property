@@ -47,7 +47,11 @@ export function GroupedBarChart({ data, series, title, footer }: Props) {
                         </li>
                     ))}
                 </ul>
-                <button type="button" onClick={() => setAsTable((v) => !v)} className="text-primary text-sm font-medium underline-offset-4 hover:underline">
+                <button
+                    type="button"
+                    onClick={() => setAsTable((v) => !v)}
+                    className="text-primary text-sm font-medium underline-offset-4 hover:underline"
+                >
                     {asTable ? 'Show chart' : 'View as table'}
                 </button>
             </div>
@@ -91,7 +95,12 @@ export function GroupedBarChart({ data, series, title, footer }: Props) {
                     </div>
                     <div className="relative h-56" onMouseLeave={() => setActive(null)}>
                         {ticks.map((t) => (
-                            <div key={t} className={cn('absolute inset-x-0 border-t', t === 0 ? 'border-border' : 'border-border/50 border-dashed')} style={{ top: `${(1 - t) * 100}%` }} aria-hidden />
+                            <div
+                                key={t}
+                                className={cn('absolute inset-x-0 border-t', t === 0 ? 'border-border' : 'border-border/50 border-dashed')}
+                                style={{ top: `${(1 - t) * 100}%` }}
+                                aria-hidden
+                            />
                         ))}
                         <div className="absolute inset-0 flex">
                             {data.map((row, i) => (
@@ -103,7 +112,10 @@ export function GroupedBarChart({ data, series, title, footer }: Props) {
                                     onMouseEnter={() => setActive(i)}
                                     onFocus={() => setActive(i)}
                                     onBlur={() => setActive(null)}
-                                    className={cn('relative flex flex-1 cursor-default items-end justify-center gap-[2px] rounded-md px-[12%] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring', active === i && 'bg-muted/60')}
+                                    className={cn(
+                                        'focus-visible:ring-ring relative flex flex-1 cursor-default items-end justify-center gap-[2px] rounded-md px-[12%] transition-colors outline-none focus-visible:ring-2',
+                                        active === i && 'bg-muted/60',
+                                    )}
                                 >
                                     {series.map((s) => {
                                         const value = Number(row[s.key]) || 0;

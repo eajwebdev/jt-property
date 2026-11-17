@@ -11,9 +11,10 @@ import { SearchSelect } from '@/components/ui/search-select';
 import AppLayout from '@/layouts/app-layout';
 import { formatCents, parsePesos } from '@/lib/money';
 import { formatDate } from '@/lib/tenant-labels';
+import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Plus, Receipt, Zap } from 'lucide-react';
+import { ArrowRight, CalendarCheck, Plus, Receipt, Repeat, Search, Zap } from 'lucide-react';
 import { FormEventHandler, useEffect, useState } from 'react';
 
 interface Recurring {
@@ -54,9 +55,9 @@ interface Props {
     today: string;
 }
 
-const stateLabels: Record<Recurring['state'], string> = { running: 'Running', scheduled: 'Starts later', ended: 'Ended', paused: 'Paused' };
+const stateLabels: Record<Recurring['state'], string> = { running: 'Active', scheduled: 'Starts later', ended: 'Stopped', paused: 'Paused' };
 const kindLabels: Record<string, string> = { rent: 'Rent', appliance: 'Appliance', utility: 'Utility', service: 'Service', other: 'Other' };
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'Charges & Utilities', href: '/charges' }];
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Extra charges', href: '/charges' }];
 const monthLabel = (ym: string) => new Date(ym + '-01T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'long' });
 
 function Empty({ children }: { children: string }) {
@@ -96,7 +97,7 @@ function EditRecurringDialog({
                         <DialogDescription>Applies to bills made from now on. Bills already issued keep their amounts.</DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-2">
-                        <Label htmlFor="er-category">Category</Label>
+                        <Label htmlFor="er-category">Charge type</Label>
                         <SearchSelect
                             id="er-category"
                             value={String(form.data.charge_category_id)}
@@ -159,7 +160,7 @@ function EndRecurringDialog({
             <DialogContent className="sm:max-w-md">
                 <form onSubmit={submit} className="space-y-4">
                     <DialogHeader>
-                        <DialogTitle>End {charge.label}</DialogTitle>
+                        <DialogTitle>Stop {charge.label}</DialogTitle>
                         <DialogDescription>
                             It will not be added to bills for periods after the last day. Past bills are not changed, and the record is kept.
                         </DialogDescription>
@@ -180,7 +181,7 @@ function EndRecurringDialog({
                         <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
-                        <Button disabled={form.processing}>{form.processing ? 'Saving...' : 'End charge'}</Button>
+                        <Button disabled={form.processing}>{form.processing ? 'Saving...' : 'Stop charge'}</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
@@ -231,7 +232,7 @@ function OneTimeDialog({
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
                 <form onSubmit={submit} className="space-y-4">
                     <DialogHeader>
-                        <DialogTitle>Add a one-time charge or credit</DialogTitle>
+                        <DialogTitle>Add a one-time charge or discount</DialogTitle>
                         <DialogDescription>Goes on the first bill made for that tenant in the month you pick, once only.</DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-2">
@@ -265,7 +266,7 @@ function OneTimeDialog({
                         <div className="flex gap-4 text-sm">
                             {[
                                 ['charge', 'Charge (adds to the bill)'],
-                                ['credit', 'Credit (reduces the bill)'],
+                                ['credit', 'Discount / credit (lowers the bill)'],
                             ].map(([value, label]) => (
                                 <label key={value} className="flex items-center gap-2">
                                     <input
@@ -281,7 +282,7 @@ function OneTimeDialog({
                         </div>
                     </fieldset>
                     <div className="grid gap-2">
-                        <Label htmlFor="ot-category">Category</Label>
+                        <Label htmlFor="ot-category">Charge type</Label>
                         <SearchSelect
                             id="ot-category"
                             value={String(form.data.charge_category_id)}
@@ -447,36 +448,141 @@ function CategoriesSection({ categories, canManage }: { categories: Category[]; 
     );
 }
 
+/** Step 1 of "Add charge": every month or just once? Then (for monthly) which boarder. */
+function AddChargeChooser({
+    options,
+    open,
+    onOpenChange,
+    onMonthly,
+    onOnce,
+}: {
+    options: Options;
+    open: boolean;
+    onOpenChange: (o: boolean) => void;
+    onMonthly: (agreementId: string) => void;
+    onOnce: () => void;
+}) {
+    const [kind, setKind] = useState<'monthly' | 'once' | null>(null);
+    const [agreementId, setAgreementId] = useState('');
+    useEffect(() => {
+        if (open) {
+            setKind(null);
+            setAgreementId('');
+        }
+    }, [open]);
+    const choice = (value: 'monthly' | 'once', title: string, text: string, Icon: typeof Repeat) => (
+        <button
+            type="button"
+            onClick={() => setKind(value)}
+            aria-pressed={kind === value}
+            className={cn(
+                'focus-visible:ring-ring flex gap-3 rounded-xl border p-4 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none',
+                kind === value ? 'border-primary bg-accent' : 'hover:bg-muted/60',
+            )}
+        >
+            <Icon className="text-primary mt-0.5 size-5 shrink-0" aria-hidden />
+            <span>
+                <span className="block font-medium">{title}</span>
+                <span className="text-muted-foreground block text-sm">{text}</span>
+            </span>
+        </button>
+    );
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Add a charge</DialogTitle>
+                    <DialogDescription>How often should it be on the boarder's bill?</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-3">
+                    {choice('monthly', 'Every month', 'Like a rice cooker or Wi-Fi fee. Stays on every bill until you end it.', Repeat)}
+                    {choice('once', 'Just once (or a discount)', 'Like a repair, a lost key, or a credit that lowers one bill.', CalendarCheck)}
+                </div>
+                {kind === 'monthly' && (
+                    <div className="grid gap-2">
+                        <Label htmlFor="ch-agreement">Which boarder?</Label>
+                        <SearchSelect
+                            id="ch-agreement"
+                            value={agreementId}
+                            onChange={setAgreementId}
+                            placeholder="Search name or room…"
+                            options={options.agreements.map((a) => ({ value: String(a.id), label: a.label }))}
+                        />
+                    </div>
+                )}
+                <DialogFooter className="gap-2">
+                    <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+                        Cancel
+                    </Button>
+                    <Button
+                        disabled={kind === null || (kind === 'monthly' && !agreementId)}
+                        onClick={() => (kind === 'monthly' ? onMonthly(agreementId) : onOnce())}
+                    >
+                        Next <ArrowRight />
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+const stateVariant: Record<Recurring['state'], 'success' | 'info' | 'muted' | 'warning'> = {
+    running: 'success',
+    scheduled: 'info',
+    ended: 'muted',
+    paused: 'warning',
+};
+
 export default function Charges({ recurring, oneTime, categories, canManage, options, today }: Props) {
     const [tab, setTab] = useState<'recurring' | 'one-time' | 'categories'>('recurring');
+    const [chooserOpen, setChooserOpen] = useState(false);
     const [addOpen, setAddOpen] = useState(false);
     const [agreementId, setAgreementId] = useState('');
     const [oneOpen, setOneOpen] = useState(false);
     const [selected, setSelected] = useState<Recurring | null>(null);
     const [mode, setMode] = useState<'edit' | 'end' | null>(null);
+    const [search, setSearch] = useState('');
+    const [showEnded, setShowEnded] = useState(false);
+    const [billedFilter, setBilledFilter] = useState<'waiting' | 'billed' | 'all'>('all');
     const { flash } = usePage<SharedData>().props;
     const agreement = options?.agreements.find((a) => String(a.id) === agreementId);
 
+    const q = search.trim().toLowerCase();
+    const matches = (...parts: (string | null)[]) => q === '' || parts.join(' ').toLowerCase().includes(q);
+    const ended = recurring.filter((c) => c.state === 'ended').length;
+    const visibleRecurring = recurring.filter((c) => (showEnded || c.state !== 'ended') && matches(c.tenant, c.room, c.label, c.category));
+    const waiting = oneTime.filter((c) => !c.billed).length;
+    const visibleOneTime = oneTime.filter(
+        (c) => (billedFilter === 'all' || (billedFilter === 'billed') === c.billed) && matches(c.tenant, c.account_no, c.label, c.category, c.reason),
+    );
+
     const tabs = [
-        ['recurring', 'Recurring add-ons'],
-        ['one-time', 'One-time charges and credits'],
-        ['categories', 'Categories'],
+        ['recurring', 'Every month', recurring.length - ended],
+        ['one-time', 'One-time & discounts', oneTime.length],
+        ['categories', 'Charge types', categories.length],
     ] as const;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Charges & Utilities" />
+            <Head title="Extra charges" />
             <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-6">
                 <PageHeader
                     icon={Receipt}
-                    title="Charges & Utilities"
-                    description="Extra fees on top of rent, like a rice cooker, a repair, or a credit."
+                    title="Extra charges"
+                    description="Anything on a bill besides rent and electricity: add-ons like a rice cooker, one-time fees like a repair, or a discount."
                     actions={
-                        <Button asChild variant="outline">
-                            <Link href={route('utilities.index')}>
-                                <Zap /> Electricity readings
-                            </Link>
-                        </Button>
+                        <>
+                            <Button asChild variant="outline">
+                                <Link href={route('utilities.index')}>
+                                    <Zap /> Electricity
+                                </Link>
+                            </Button>
+                            {canManage && options && (
+                                <Button onClick={() => setChooserOpen(true)}>
+                                    <Plus /> Add charge
+                                </Button>
+                            )}
+                        </>
                     }
                 />
 
@@ -486,57 +592,73 @@ export default function Charges({ recurring, oneTime, categories, canManage, opt
                     </Alert>
                 )}
 
-                <div role="tablist" aria-label="Charges" className="bg-muted/60 inline-flex max-w-full flex-wrap gap-1 rounded-xl border p-1">
-                    {tabs.map(([key, label]) => (
-                        <Button
-                            key={key}
-                            role="tab"
-                            aria-selected={tab === key}
-                            variant={tab === key ? 'default' : 'ghost'}
-                            onClick={() => setTab(key)}
-                        >
-                            {label}
-                        </Button>
-                    ))}
+                <div className="flex flex-wrap items-center gap-3">
+                    <div role="tablist" aria-label="Charges" className="bg-muted/60 inline-flex max-w-full flex-wrap gap-1 rounded-xl border p-1">
+                        {tabs.map(([key, label, count]) => (
+                            <button
+                                key={key}
+                                type="button"
+                                role="tab"
+                                aria-selected={tab === key}
+                                onClick={() => setTab(key)}
+                                className={cn(
+                                    'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                                    tab === key ? 'bg-card text-foreground shadow-soft' : 'text-muted-foreground hover:text-foreground',
+                                )}
+                            >
+                                {label}
+                                <span className="bg-muted rounded-full px-1.5 font-mono text-xs tabular-nums">{count}</span>
+                            </button>
+                        ))}
+                    </div>
+                    {tab !== 'categories' && (
+                        <div className="relative ml-auto w-full sm:w-72">
+                            <Search
+                                className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
+                                aria-hidden
+                            />
+                            <Input
+                                type="search"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search boarder, room or charge"
+                                aria-label="Search boarder, room or charge"
+                                className="pl-8"
+                            />
+                        </div>
+                    )}
                 </div>
 
                 {tab === 'recurring' && (
-                    <section aria-label="Recurring add-ons" className="space-y-3">
-                        <p className="text-muted-foreground text-sm">Added to every monthly bill from the start date until you end it.</p>
-                        {canManage && options && (
-                            <div className="flex flex-wrap items-end gap-3">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="rc-agreement">Add for</Label>
-                                    <SearchSelect
-                                        id="rc-agreement"
-                                        value={String(agreementId)}
-                                        onChange={(v) => setAgreementId(v)}
-                                        placeholder="Search tenant or room…"
-                                        options={options.agreements.map((a) => ({ value: String(a.id), label: a.label }))}
-                                    />
-                                </div>
-                                <Button disabled={!agreement} onClick={() => setAddOpen(true)}>
-                                    <Plus /> Add recurring charge
-                                </Button>
-                            </div>
-                        )}
-                        {recurring.length === 0 ? (
-                            <Empty>No recurring charges yet</Empty>
+                    <section aria-label="Every-month charges" className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-muted-foreground text-sm">Added to every monthly bill from the start date until you end it.</p>
+                            {ended > 0 && (
+                                <label className="text-muted-foreground flex items-center gap-2 text-sm">
+                                    <input type="checkbox" checked={showEnded} onChange={(e) => setShowEnded(e.target.checked)} />
+                                    Show {ended} ended
+                                </label>
+                            )}
+                        </div>
+                        {visibleRecurring.length === 0 ? (
+                            <Empty>{recurring.length === 0 ? 'No every-month charges yet. Use "Add charge" to add one.' : 'Nothing matches.'}</Empty>
                         ) : (
-                            <ul className="divide-y rounded-lg border">
-                                {recurring.map((c) => (
+                            <ul className="surface divide-y">
+                                {visibleRecurring.map((c) => (
                                     <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 p-3 text-sm">
-                                        <div>
+                                        <div className="min-w-0">
                                             <p className="font-medium">
-                                                {c.label} - {c.amount} a month
+                                                {c.label} <span className="text-muted-foreground font-normal">· {c.category}</span>
                                             </p>
                                             <p className="text-muted-foreground">
-                                                {c.tenant}, room {c.room}. From {formatDate(c.start_date)}
+                                                {c.tenant}, room {c.room} · from {formatDate(c.start_date)}
                                                 {c.end_date && ` to ${formatDate(c.end_date)}`}
                                             </p>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <Badge variant="outline">{stateLabels[c.state]}</Badge>
+                                            <span className="font-mono font-semibold tabular-nums">{c.amount}</span>
+                                            <span className="text-muted-foreground text-xs">/ month</span>
+                                            <Badge variant={stateVariant[c.state]}>{stateLabels[c.state]}</Badge>
                                             {canManage && c.state !== 'ended' && (
                                                 <>
                                                     <Button
@@ -551,13 +673,13 @@ export default function Charges({ recurring, oneTime, categories, canManage, opt
                                                     </Button>
                                                     <Button
                                                         size="sm"
-                                                        variant="outline"
+                                                        variant="ghost"
                                                         onClick={() => {
                                                             setSelected(c);
                                                             setMode('end');
                                                         }}
                                                     >
-                                                        End
+                                                        Stop
                                                     </Button>
                                                 </>
                                             )}
@@ -570,28 +692,56 @@ export default function Charges({ recurring, oneTime, categories, canManage, opt
                 )}
 
                 {tab === 'one-time' && (
-                    <section aria-label="One-time charges and credits" className="space-y-3">
-                        {canManage && options && (
-                            <Button onClick={() => setOneOpen(true)}>
-                                <Plus /> Add one-time charge or credit
-                            </Button>
-                        )}
-                        {oneTime.length === 0 ? (
-                            <Empty>No one-time charges or credits yet</Empty>
+                    <section aria-label="One-time charges and discounts" className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-muted-foreground text-sm">Goes on one bill only, in the month you picked.</p>
+                            <div className="bg-muted/60 inline-flex gap-1 rounded-lg p-1 text-xs" role="group" aria-label="Show">
+                                {(
+                                    [
+                                        ['all', `All ${oneTime.length}`],
+                                        ['waiting', `Waiting for a bill ${waiting}`],
+                                        ['billed', `On a bill ${oneTime.length - waiting}`],
+                                    ] as const
+                                ).map(([key, label]) => (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        aria-pressed={billedFilter === key}
+                                        onClick={() => setBilledFilter(key)}
+                                        className={cn(
+                                            'rounded-md px-2.5 py-1 font-medium',
+                                            billedFilter === key
+                                                ? 'bg-card text-foreground shadow-soft'
+                                                : 'text-muted-foreground hover:text-foreground',
+                                        )}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        {visibleOneTime.length === 0 ? (
+                            <Empty>{oneTime.length === 0 ? 'No one-time charges or discounts yet.' : 'Nothing matches.'}</Empty>
                         ) : (
-                            <ul className="divide-y rounded-lg border">
-                                {oneTime.map((c) => (
+                            <ul className="surface divide-y">
+                                {visibleOneTime.map((c) => (
                                     <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 p-3 text-sm">
-                                        <div>
+                                        <div className="min-w-0">
                                             <p className="font-medium">
-                                                {c.label} - {c.amount}
+                                                {c.label} <span className="text-muted-foreground font-normal">· {c.category}</span>
                                             </p>
                                             <p className="text-muted-foreground">
-                                                {c.tenant} ({c.account_no}), {monthLabel(c.bill_month)} bill. {c.category}
-                                                {c.reason && `. ${c.reason}`}
+                                                {c.tenant} ({c.account_no}) · {monthLabel(c.bill_month)} bill
+                                                {c.reason && ` · ${c.reason}`}
                                             </p>
                                         </div>
-                                        <Badge variant="outline">{c.billed ? 'On a bill' : 'Waiting for the bill'}</Badge>
+                                        <div className="flex items-center gap-2">
+                                            <span className={cn('font-mono font-semibold tabular-nums', c.kind === 'credit' && 'text-success')}>
+                                                {c.kind === 'credit' ? `− ${c.amount}` : c.amount}
+                                            </span>
+                                            {c.kind === 'credit' && <Badge variant="success">Discount</Badge>}
+                                            <Badge variant={c.billed ? 'muted' : 'info'}>{c.billed ? 'On a bill' : 'Waiting for the bill'}</Badge>
+                                        </div>
                                     </li>
                                 ))}
                             </ul>
@@ -599,9 +749,32 @@ export default function Charges({ recurring, oneTime, categories, canManage, opt
                     </section>
                 )}
 
-                {tab === 'categories' && <CategoriesSection categories={categories} canManage={canManage} />}
+                {tab === 'categories' && (
+                    <section aria-label="Charge types" className="space-y-3">
+                        <p className="text-muted-foreground text-sm">
+                            The list of names you pick from when adding a charge. Built-in types cannot be renamed.
+                        </p>
+                        <CategoriesSection categories={categories} canManage={canManage} />
+                    </section>
+                )}
             </div>
 
+            {canManage && options && (
+                <AddChargeChooser
+                    options={options}
+                    open={chooserOpen}
+                    onOpenChange={setChooserOpen}
+                    onMonthly={(id) => {
+                        setAgreementId(id);
+                        setChooserOpen(false);
+                        setAddOpen(true);
+                    }}
+                    onOnce={() => {
+                        setChooserOpen(false);
+                        setOneOpen(true);
+                    }}
+                />
+            )}
             {canManage && agreement && (
                 <AddRecurringChargeDialog
                     agreementId={agreement.id}

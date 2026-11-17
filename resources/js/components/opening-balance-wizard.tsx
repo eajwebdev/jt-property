@@ -73,7 +73,7 @@ export function OpeningBalanceWizard({ account, today, onClose }: { account: Wiz
                         Opening balance for {account.tenant} ({account.account_no})
                     </DialogTitle>
                     <DialogDescription>
-                        Step {step + 1} of 3: {STEPS[step]}. Unpaid debt from before the JT system. It is posted once and is never billed as rent.
+                        Step {step + 1} of 3: {STEPS[step]}. Unpaid debt from before this system. It is posted once and is never billed as rent.
                     </DialogDescription>
                 </DialogHeader>
 

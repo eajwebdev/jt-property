@@ -6,7 +6,7 @@
     $peso = fn (int $c) => Money::format($c);
     $b64 = fn (string $path) => base64_encode((string) @file_get_contents($path));
     $font = fn (int $w) => 'data:font/woff2;base64,'.$b64(resource_path("fonts/instrument-sans-latin-{$w}.woff2"));
-    $logo = 'data:image/png;base64,'.$b64(resource_path('img/jt-logo-horizontal-pdf.png'));
+    $logo = 'data:image/png;base64,'.$b64(resource_path('img/mubarak-logo-horizontal-pdf.png'));
     $period = $d($s->periodStart).' – '.$d($s->periodEnd);
     $usage = function (array $l) use ($period) {
         if ($l['qty_e3'] !== null && $l['unit_rate_e4'] !== null) {
@@ -27,7 +27,7 @@
     @font-face { font-family: 'Instrument Sans'; font-weight: 400; src: url({{ $font(400) }}) format('woff2'); }
     @font-face { font-family: 'Instrument Sans'; font-weight: 600; src: url({{ $font(600) }}) format('woff2'); }
     @font-face { font-family: 'Instrument Sans'; font-weight: 700; src: url({{ $font(700) }}) format('woff2'); }
-    :root { --navy:#064578; --teal:#007A69; --mint:#24C5A4; --mint-soft:#E6F7F3; --canvas:#F5F9FC; --text:#0F1E2E; --muted:#52637A; --border:#DCE5EE; --danger:#C2362F; }
+    :root { --navy:#0B3466; --teal:#0B7A48; --mint:#13A35C; --mint-soft:#E6F4EC; --canvas:#F5F9FC; --text:#0F1E2E; --muted:#52637A; --border:#DCE5EE; --danger:#C2362F; }
     * { box-sizing: border-box; }
     html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     body { margin: 0; color: var(--text); background: #fff; font: 400 9pt/1.35 'Instrument Sans', 'Segoe UI', 'Noto Sans', 'DejaVu Sans', Arial, sans-serif; }
@@ -109,7 +109,7 @@
     .toolbar { position: sticky; top: 0; z-index: 10; background: var(--navy); color: #fff; padding: 2.5mm 6mm; display: flex; justify-content: space-between; align-items: center; font-size: 10pt; }
     .toolbar a, .toolbar button { color: #fff; background: var(--teal); padding: 1.6mm 4mm; border: 0; border-radius: 1.5mm; text-decoration: none; font: inherit; font-weight: 600; cursor: pointer; }
     @media print { .toolbar { display: none; } }
-    @media screen { body { background: #e9eef4; } .sheet { background: #fff; margin-top: 6mm; margin-bottom: 6mm; box-shadow: 0 1px 8px rgba(6, 69, 120, .2); } }
+    @media screen { body { background: #e9eef4; } .sheet { background: #fff; margin-top: 6mm; margin-bottom: 6mm; box-shadow: 0 1px 8px rgba(11, 52, 102, .2); } }
     @media screen and (max-width: 215mm) { .sheet { width: 100%; padding: 0 5mm; } .head { margin: 0 -5mm 4mm; } .head .title { width: 60%; padding-right: 5mm; } }
     @page { size: A4; }
 </style>

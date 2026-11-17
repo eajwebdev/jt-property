@@ -9,13 +9,11 @@ use App\Http\Controllers\ChargeController;
 use App\Http\Controllers\CollectionsController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceStatementController;
-use App\Http\Controllers\LandingController;
 use App\Http\Controllers\OccupancyController;
 use App\Http\Controllers\OneTimeChargeController;
 use App\Http\Controllers\OpeningBalanceController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PropertyController;
-use App\Http\Controllers\PropertyPhotoController;
 use App\Http\Controllers\RecurringChargeController;
 use App\Http\Controllers\RentalAgreementController;
 use App\Http\Controllers\ReportsController;
@@ -27,14 +25,13 @@ use App\Http\Controllers\UtilityController;
 use App\Http\Controllers\UtilityExclusionController;
 use Illuminate\Support\Facades\Route;
 
-// Public website: listed boarding houses with photos and free places. Staff log in from the header.
-Route::get('/', [LandingController::class, 'index'])->name('home');
-Route::get('places/{code}', [LandingController::class, 'show'])->where('code', '[A-Z0-9]{2,10}')->name('listings.show');
-Route::get('property-photos/{photo}', [PropertyPhotoController::class, 'show'])->name('property-photos.show');
+// No public website: the login page is the first page. Signed-in users go straight to the dashboard.
+Route::get('/', fn () => redirect()->route(auth()->check() ? 'dashboard' : 'login'))->name('home');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('calendar', CalendarController::class)->name('calendar.index');
+    Route::inertia('guide', 'guide')->name('guide');
     Route::get('audit', AuditLogController::class)->middleware('role:owner')->name('audit.index');
     Route::get('reports', [ReportsController::class, 'index'])->name('reports.index');
     Route::get('reports/overview.pdf', [ReportsController::class, 'pdf'])->name('reports.pdf');
@@ -43,9 +40,6 @@ Route::middleware(['auth'])->group(function () {
 
     Route::resource('properties', PropertyController::class)->except('destroy');
     Route::resource('properties.units', UnitController::class)->shallow()->only(['store', 'update']);
-    Route::post('properties/{property}/photos', [PropertyPhotoController::class, 'store'])->name('properties.photos.store');
-    Route::patch('property-photos/{photo}', [PropertyPhotoController::class, 'update'])->name('property-photos.update');
-    Route::delete('property-photos/{photo}', [PropertyPhotoController::class, 'destroy'])->name('property-photos.destroy');
     Route::resource('tenants', TenantController::class)->except('destroy');
     Route::patch('tenants/{tenant}/archive', [TenantController::class, 'archive'])->name('tenants.archive');
     Route::post('tenants/{tenant}/agreements', [RentalAgreementController::class, 'store'])->name('tenants.agreements.store');
@@ -87,6 +81,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('invoices/{invoice}/statement.pdf', [InvoiceStatementController::class, 'download'])->name('invoices.statement.pdf');
     Route::get('invoices/{invoice}/statement-copy.pdf', [InvoiceStatementController::class, 'copy'])->name('invoices.statement.copy');
     Route::get('billing', [BillingController::class, 'index'])->name('billing.index');
+    Route::get('billing/statements.pdf', [BillingController::class, 'monthStatements'])->name('billing.month-statements');
     Route::post('billing/generate', [BillingController::class, 'generate'])->name('billing.generate');
     Route::get('billing/batches/{batch}', [BillingController::class, 'showBatch'])->name('billing.batches.show');
     Route::get('billing/batches/{batch}/download.zip', [BillingController::class, 'downloadBatch'])->name('billing.batches.zip');

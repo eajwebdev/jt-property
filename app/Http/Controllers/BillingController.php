@@ -398,8 +398,8 @@ class BillingController extends Controller
         }
 
         try {
-            Mail::raw('JT Property billing email test. Your mail settings are working.', function ($message) use ($request): void {
-                $message->to($request->user()->email)->subject('JT Property mail test');
+            Mail::raw('Mubarak Boardinghouse billing email test. Your mail settings are working.', function ($message) use ($request): void {
+                $message->to($request->user()->email)->subject('Mubarak Boardinghouse mail test');
             });
         } catch (Throwable $exception) {
             Log::error('Billing SMTP test failed', ['exception' => $exception]);
@@ -432,6 +432,29 @@ class BillingController extends Controller
         $bytes = $exports->combined($invoices);
 
         $filename = sprintf('bills-%04d-%02d.pdf', $batch->year, $batch->month);
+
+        return response()->stream(fn () => print ($bytes), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+        ]);
+    }
+
+    /** Every finalized statement of a month (one property or all the user may see) in one printable PDF. */
+    public function monthStatements(Request $request, BatchExportService $exports): StreamedResponse
+    {
+        $data = $request->validate([
+            'year' => ['required', 'integer', 'between:2000,2100'],
+            'month' => ['required', 'integer', 'between:1,12'],
+            'property_id' => ['nullable', 'integer'],
+        ]);
+        $scope = collect($this->properties($request))->pluck('id')
+            ->when($data['property_id'] ?? null, fn ($c, $id) => $c->intersect([(int) $id]))->values()->all();
+        $invoices = $this->monthInvoices((int) $data['year'], (int) $data['month'], null)
+            ->whereIn('property_id', $scope)->orderBy('number')->get();
+        abort_if($invoices->isEmpty(), 404);
+        $bytes = $exports->combined($invoices);
+
+        $filename = sprintf('statements-%04d-%02d.pdf', $data['year'], $data['month']);
 
         return response()->stream(fn () => print ($bytes), 200, [
             'Content-Type' => 'application/pdf',

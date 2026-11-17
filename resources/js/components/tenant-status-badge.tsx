@@ -12,10 +12,15 @@ const config: Record<string, { label: string; className: string }> = {
 export default function TenantStatusBadge({ status, date }: { status: string; date?: string | null }) {
     const found = config[status] ?? { label: status, className: 'bg-muted text-muted-foreground' };
     const { className } = found;
-    const label = status === 'upcoming' && date ? `Moving in ${formatDate(date)}` : status === 'archived' && date ? `Archived on ${formatDate(date)}` : found.label;
+    const label =
+        status === 'upcoming' && date
+            ? `Moving in ${formatDate(date)}`
+            : status === 'archived' && date
+              ? `Archived on ${formatDate(date)}`
+              : found.label;
     return <Badge className={cn('border-transparent whitespace-nowrap', className)}>{label}</Badge>;
 }
 
 export function NoEmailBadge() {
-    return <Badge className="border-transparent bg-warning whitespace-nowrap text-warning-foreground">No email</Badge>;
+    return <Badge className="bg-warning text-warning-foreground border-transparent whitespace-nowrap">No email</Badge>;
 }

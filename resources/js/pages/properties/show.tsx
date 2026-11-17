@@ -1,7 +1,6 @@
 import { EmptyState } from '@/components/empty-state';
 import { PageHeader } from '@/components/page-header';
 import PropertyFormDialog, { type PropertyFormData } from '@/components/property-form-dialog';
-import PropertyPhotos from '@/components/property-photos';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,9 +9,9 @@ import UnitStatusBadge from '@/components/unit-status-badge';
 import { useUrlModal } from '@/hooks/use-url-modal';
 import AppLayout from '@/layouts/app-layout';
 import { propertyTypeLabels, rentModeLabels } from '@/lib/property-labels';
-import { type BreadcrumbItem, type PropertyDetail, type PropertyPhoto, type SharedData, type UnitRow } from '@/types';
+import { type BreadcrumbItem, type PropertyDetail, type SharedData, type UnitRow } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
-import { BedDouble, Building2, ExternalLink, Globe, MapPin, Pencil, Plus, Users } from 'lucide-react';
+import { BedDouble, Building2, MapPin, Pencil, Plus, Users } from 'lucide-react';
 import { useState } from 'react';
 
 interface Props {
@@ -21,8 +20,6 @@ interface Props {
     staff: { id: number; name: string }[];
     canManage: boolean;
     form: PropertyFormData | null;
-    photos: PropertyPhoto[];
-    maxPhotos: number;
 }
 
 function Occupants({ unit }: { unit: UnitRow }) {
@@ -41,7 +38,7 @@ function Occupants({ unit }: { unit: UnitRow }) {
 
 const place = (unit: UnitRow) => [unit.building, unit.floor && `Floor ${unit.floor}`].filter(Boolean).join(', ') || '-';
 
-export default function Show({ property, units, staff, canManage, form, photos, maxPhotos }: Props) {
+export default function Show({ property, units, staff, canManage, form }: Props) {
     const [editing, setEditing] = useUrlModal('edit');
     const { flash } = usePage<SharedData>().props;
     const [dialog, setDialog] = useState<{ open: boolean; unit: UnitRow | null }>({ open: false, unit: null });
@@ -70,13 +67,6 @@ export default function Show({ property, units, staff, canManage, form, photos, 
                     actions={
                         canManage && (
                             <>
-                                {property.show_on_website && (
-                                    <Button asChild variant="ghost">
-                                        <a href={route('listings.show', property.code)} target="_blank" rel="noopener noreferrer">
-                                            <ExternalLink /> View public page
-                                        </a>
-                                    </Button>
-                                )}
                                 {form && (
                                     <Button variant="outline" onClick={() => setEditing(true)}>
                                         <Pencil /> Edit property
@@ -94,15 +84,6 @@ export default function Show({ property, units, staff, canManage, form, photos, 
                         <Badge variant="outline" className="font-mono">
                             {property.code}
                         </Badge>
-                        {property.show_on_website ? (
-                            <Badge variant="success">
-                                <Globe className="size-3" aria-hidden /> Listed on website
-                            </Badge>
-                        ) : (
-                            <Badge variant="muted">
-                                <Globe className="size-3" aria-hidden /> Not on website
-                            </Badge>
-                        )}
                         {canManage && (
                             <Badge variant="info">
                                 <Users className="size-3" aria-hidden /> {staff.length ? staff.map((s) => s.name).join(', ') : 'No staff assigned'}
@@ -116,8 +97,6 @@ export default function Show({ property, units, staff, canManage, form, photos, 
                         <AlertDescription>{flash.success}</AlertDescription>
                     </Alert>
                 )}
-
-                <PropertyPhotos propertyId={property.id} photos={photos} max={maxPhotos} canManage={canManage} listed={property.show_on_website} />
 
                 <h2 className="text-lg font-semibold">Rooms</h2>
                 {units.length === 0 ? (

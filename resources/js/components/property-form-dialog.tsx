@@ -23,7 +23,6 @@ export interface PropertyFormData {
         description: string | null;
         amenities: string | null;
         auto_send_email: boolean;
-        show_on_website: boolean;
         has_billing: boolean;
     } | null;
     staff_ids: number[];
@@ -58,7 +57,6 @@ function PropertyForm({ form: { property, staff_ids, types, staff }, onDone }: {
         description: property?.description ?? '',
         amenities: property?.amenities ?? '',
         auto_send_email: property?.auto_send_email ?? false,
-        show_on_website: property?.show_on_website ?? false,
         staff_ids,
     });
 
@@ -169,21 +167,6 @@ function PropertyForm({ form: { property, staff_ids, types, staff }, onDone }: {
                         onChange={(e) => setData('description', e.target.value)}
                     />
                     <InputError message={errors.description} />
-                </div>
-            </div>
-
-            <div className="bg-muted/40 flex items-start gap-3 rounded-xl border p-4">
-                <Checkbox
-                    id="show_on_website"
-                    checked={data.show_on_website}
-                    onCheckedChange={(checked) => setData('show_on_website', checked === true)}
-                />
-                <div>
-                    <Label htmlFor="show_on_website">Show on the public website</Label>
-                    <p className="text-muted-foreground text-sm">
-                        Visitors see its name, address, photos, what is included and how many places are free. Never tenant details.
-                    </p>
-                    <InputError message={errors.show_on_website} />
                 </div>
             </div>
 

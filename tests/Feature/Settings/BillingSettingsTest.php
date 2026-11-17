@@ -48,7 +48,7 @@ class BillingSettingsTest extends TestCase
 
     public function test_defaults_are_returned_when_unset(): void
     {
-        $this->assertSame('JT Property Management', Settings::get('company_name'));
+        $this->assertSame('Mubarak Boardinghouse', Settings::get('company_name'));
         $this->assertFalse(Settings::get('auto_send_email'));
         $this->assertFalse(Settings::get('auto_generate'));
         $this->assertSame(7, Settings::get('generate_lead_days'));
@@ -73,7 +73,7 @@ class BillingSettingsTest extends TestCase
         $this->assertSame('Acme', Settings::get('company_name'));
         $this->assertDatabaseHas('app_settings', ['key' => 'company_name', 'updated_by' => $owner->id]);
         $log = ActivityLog::where('action', 'settings.updated')->firstOrFail();
-        $this->assertSame(['key' => 'company_name', 'old' => 'JT Property Management', 'new' => 'Acme'], $log->properties);
+        $this->assertSame(['key' => 'company_name', 'old' => 'Mubarak Boardinghouse', 'new' => 'Acme'], $log->properties);
     }
 
     public function test_set_rejects_unknown_key(): void
@@ -119,7 +119,7 @@ class BillingSettingsTest extends TestCase
         foreach ([Role::Staff, Role::Accountant] as $role) {
             $this->actingAs($this->user($role))->put('/settings/billing', $this->payload())->assertForbidden();
         }
-        $this->assertSame('JT Property Management', Settings::get('company_name'));
+        $this->assertSame('Mubarak Boardinghouse', Settings::get('company_name'));
     }
 
     public function test_everyone_sees_company_and_payment_instructions_but_only_owner_gets_automation(): void
@@ -175,7 +175,7 @@ class BillingSettingsTest extends TestCase
 
     public function test_cache_is_cleared_when_a_queue_job_starts(): void
     {
-        $this->assertSame('JT Property Management', Settings::get('company_name'));
+        $this->assertSame('Mubarak Boardinghouse', Settings::get('company_name'));
         AppSetting::create(['key' => 'company_name', 'value' => 'Changed']);
 
         event(new JobProcessing('sync', $this->createMock(Job::class)));

@@ -140,6 +140,87 @@ function Meter({ value, tone = 'bg-primary', label }: { value: number; tone?: st
     );
 }
 
+/** The owner's monthly routine as four numbered steps, each a link to the screen that does it. */
+function MonthlyRoutine({ metrics }: { metrics: Metrics }) {
+    const now = new Date();
+    const month = now.toLocaleDateString('en-PH', { month: 'long' });
+    const billing = route('billing.index', { year: now.getFullYear(), month: now.getMonth() + 1 });
+    const steps: { title: string; text: string; href: string; icon: typeof Zap; status?: ReactNode }[] = [
+        {
+            title: 'Enter electricity',
+            text: "Type each boarder's electric bill (the ⚡ button on the bills list), or a room's meter reading.",
+            href: billing,
+            icon: Zap,
+            status: metrics.pending_utilities > 0 ? <Badge variant="warning">{metrics.pending_utilities} readings not billed yet</Badge> : null,
+        },
+        {
+            title: 'Generate bills',
+            text: `Check the ${month} preview, then press Generate. Nothing is saved before that.`,
+            href: billing,
+            icon: FileText,
+            status:
+                metrics.billed_cents > 0 ? (
+                    <Badge variant="success">{formatCents(metrics.billed_cents)} billed</Badge>
+                ) : (
+                    <Badge variant="muted">Not billed yet</Badge>
+                ),
+        },
+        {
+            title: 'Print or email statements',
+            text: 'Print every statement in one PDF, or email them to all boarders at once.',
+            href: billing,
+            icon: Receipt,
+        },
+        {
+            title: 'Record payments',
+            text: 'When a boarder pays, record it so their balance and receipt update.',
+            href: route('collections.index'),
+            icon: HandCoins,
+            status:
+                metrics.late_accounts > 0 ? (
+                    <Badge variant="danger">{metrics.late_accounts} late</Badge>
+                ) : (
+                    <Badge variant="success">Nobody late</Badge>
+                ),
+        },
+    ];
+    return (
+        <Panel
+            title={`${month} checklist`}
+            description="Do these in order each month. Click a step to open its screen."
+            action={
+                <Button asChild variant="ghost" size="sm">
+                    <Link href={route('guide')}>
+                        Full flowchart <ArrowRight />
+                    </Link>
+                </Button>
+            }
+        >
+            <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {steps.map((step, i) => (
+                    <li key={step.title}>
+                        <Link
+                            href={step.href}
+                            className="hover:border-primary/40 hover:bg-accent/40 focus-visible:ring-ring flex h-full gap-3 rounded-xl border p-3 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                        >
+                            <span className="bg-primary text-primary-foreground grid size-7 shrink-0 place-items-center rounded-full text-sm font-semibold">
+                                {i + 1}
+                            </span>
+                            <span className="min-w-0 space-y-1">
+                                <span className="flex items-center gap-1.5 font-medium">
+                                    <step.icon className="text-primary size-4" aria-hidden /> {step.title}
+                                </span>
+                                <span className="text-muted-foreground block text-xs leading-snug">{step.text}</span>
+                                {step.status && <span className="block pt-0.5">{step.status}</span>}
+                            </span>
+                        </Link>
+                    </li>
+                ))}
+            </ol>
+        </Panel>
+    );
+}
+
 function TabLoading() {
     return (
         <div className="space-y-4" aria-busy="true" aria-label="Loading">
@@ -235,12 +316,14 @@ export default function Dashboard({ metrics, due, recentActivity, income, late, 
                     </TabsList>
 
                     <TabsContent value="overview" className="space-y-6">
+                        {isOwner && <MonthlyRoutine metrics={metrics} />}
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <StatCard
                                 label="Collected this month"
                                 value={formatCents(metrics.collected_cents)}
                                 icon={Wallet}
                                 tone="success"
+                                href={route('collections.index')}
                                 hint={`${collectionRate}% of ${formatCents(metrics.billed_cents)} billed`}
                             />
                             <StatCard
@@ -248,6 +331,7 @@ export default function Dashboard({ metrics, due, recentActivity, income, late, 
                                 value={formatCents(metrics.overdue_cents)}
                                 icon={CircleAlert}
                                 tone="danger"
+                                href={route('dashboard', { tab: 'late' })}
                                 hint={`${metrics.late_accounts} late ${metrics.late_accounts === 1 ? 'account' : 'accounts'}`}
                             />
                             <StatCard
@@ -255,6 +339,7 @@ export default function Dashboard({ metrics, due, recentActivity, income, late, 
                                 value={formatCents(metrics.coming_due_cents)}
                                 icon={CalendarClock}
                                 tone="warning"
+                                href={route('calendar.index')}
                                 hint={`Open charges ${formatCents(metrics.still_due_cents)}`}
                             />
                             <StatCard
@@ -262,18 +347,33 @@ export default function Dashboard({ metrics, due, recentActivity, income, late, 
                                 value={`${occupancyRate}%`}
                                 icon={BedDouble}
                                 tone="info"
+                                href={route('dashboard', { tab: 'occupancy' })}
                                 hint={`${metrics.occupied} of ${metrics.capacity} places · ${metrics.vacant} vacant`}
                             />
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                            <StatCard label="Billed this month" value={formatCents(metrics.billed_cents)} icon={Receipt} tone="brand" />
-                            <StatCard label="Properties" value={metrics.properties} icon={Building2} tone="brand" hint={`${metrics.rooms} rooms`} />
-                            <StatCard label="Vacant places" value={metrics.vacant} icon={BedDouble} />
+                            <StatCard
+                                label="Billed this month"
+                                value={formatCents(metrics.billed_cents)}
+                                icon={Receipt}
+                                tone="brand"
+                                href={route('billing.index')}
+                            />
+                            <StatCard
+                                label="Properties"
+                                value={metrics.properties}
+                                icon={Building2}
+                                tone="brand"
+                                hint={`${metrics.rooms} rooms`}
+                                href={route('properties.index')}
+                            />
+                            <StatCard label="Vacant places" value={metrics.vacant} icon={BedDouble} href={route('dashboard', { tab: 'occupancy' })} />
                             <StatCard
                                 label="Utility bills to bill"
                                 value={metrics.pending_utilities}
                                 icon={Zap}
                                 tone={metrics.pending_utilities > 0 ? 'warning' : 'default'}
+                                href={route('utilities.index')}
                                 hint={metrics.pending_utilities > 0 ? 'Draft readings this month' : 'All caught up'}
                             />
                         </div>

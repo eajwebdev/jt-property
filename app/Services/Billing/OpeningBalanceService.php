@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 /**
- * Unpaid debt from before the JT system. Posted to the ledger once as an `opening` entry,
+ * Unpaid debt from before this system. Posted to the ledger once as an `opening` entry,
  * never billed as rent, never mixed with deposits or advances. Callers authorize (owner only).
  */
 class OpeningBalanceService

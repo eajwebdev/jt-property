@@ -17,11 +17,11 @@ const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
 const handleSystemThemeChange = () => {
     const currentAppearance = localStorage.getItem('appearance') as Appearance;
-    applyTheme(currentAppearance || 'system');
+    applyTheme(currentAppearance || 'light');
 };
 
 export function initializeTheme() {
-    const savedAppearance = (localStorage.getItem('appearance') as Appearance) || 'system';
+    const savedAppearance = (localStorage.getItem('appearance') as Appearance) || 'light';
 
     applyTheme(savedAppearance);
 
@@ -36,7 +36,7 @@ export function syncAppearance(mode: Appearance) {
 }
 
 export function useAppearance() {
-    const [appearance, setAppearance] = useState<Appearance>('system');
+    const [appearance, setAppearance] = useState<Appearance>('light');
     const { auth } = usePage<SharedData>().props;
     const loggedIn = Boolean(auth?.user);
 
@@ -50,7 +50,7 @@ export function useAppearance() {
     };
 
     useEffect(() => {
-        const savedAppearance = (localStorage.getItem('appearance') as Appearance | null) || 'system';
+        const savedAppearance = (localStorage.getItem('appearance') as Appearance | null) || 'light';
         setAppearance(savedAppearance);
         applyTheme(savedAppearance);
         // No cleanup: the system-theme listener is app-wide (registered once by initializeTheme).

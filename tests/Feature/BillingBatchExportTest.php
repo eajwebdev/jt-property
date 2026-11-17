@@ -130,6 +130,25 @@ class BillingBatchExportTest extends TestCase
         $this->actingAs($staff)->get(route('invoices.statement.pdf', Invoice::whereHas('property', fn ($query) => $query->where('code', 'HIL'))->firstOrFail()))->assertForbidden();
     }
 
+    public function test_month_statements_pdf_combines_every_bill_of_the_month_in_scope(): void
+    {
+        $owner = $this->owner();
+        $accounts = BillingAccount::orderBy('id')->limit(2)->pluck('id')->all();
+        $this->actingAs($owner)->post(route('billing.generate'), ['year' => 2026, 'month' => 11, 'account_ids' => $accounts])->assertRedirect();
+
+        $response = $this->get(route('billing.month-statements', ['year' => 2026, 'month' => 11]));
+        $response->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $pdf = $response->streamedContent();
+        $this->assertStringStartsWith('%PDF', $pdf);
+        $this->assertGreaterThanOrEqual(2, preg_match_all('#/Type\s*/Page\b(?!s)#', $pdf));
+
+        // A month with no bills, and a property the staff member is not assigned to: nothing to print.
+        $this->get(route('billing.month-statements', ['year' => 2026, 'month' => 10]))->assertNotFound();
+        $staff = User::where('role', 'staff')->orderBy('id')->firstOrFail();
+        $other = Property::whereNotIn('id', $staff->properties()->select('properties.id'))->orderBy('id')->firstOrFail();
+        $this->actingAs($staff)->get(route('billing.month-statements', ['year' => 2026, 'month' => 11, 'property_id' => $other->id]))->assertNotFound();
+    }
+
     public function test_replayed_batch_can_export_previously_created_invoices(): void
     {
         $owner = $this->owner();

@@ -16,7 +16,11 @@ interface Props {
     account: { id: number; number: string; tenant: string; property: string };
     from: string;
     to: string;
-    statement: { opening_cents: number; closing_cents: number; rows: { date: string; type: string; memo: string | null; amount_cents: number; balance_cents: number }[] };
+    statement: {
+        opening_cents: number;
+        closing_cents: number;
+        rows: { date: string; type: string; memo: string | null; amount_cents: number; balance_cents: number }[];
+    };
 }
 
 export default function AccountStatement({ account, from, to, statement }: Props) {
@@ -41,7 +45,11 @@ export default function AccountStatement({ account, from, to, statement }: Props
                     description={`${account.tenant} · ${account.number} · ${account.property}`}
                     actions={
                         <Button asChild variant="outline">
-                            <a href={route('accounts.statement.pdf', { account: account.id, from: start, to: end })} target="_blank" rel="noopener noreferrer">
+                            <a
+                                href={route('accounts.statement.pdf', { account: account.id, from: start, to: end })}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
                                 <FileDown /> View PDF
                             </a>
                         </Button>
@@ -63,8 +71,18 @@ export default function AccountStatement({ account, from, to, statement }: Props
                 </form>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                    <StatCard label={`Opening balance · ${formatDate(from)}`} value={formatCents(statement.opening_cents)} icon={Scale} tone="brand" />
-                    <StatCard label={`Closing balance · ${formatDate(to)}`} value={formatCents(statement.closing_cents)} icon={Scale} tone={statement.closing_cents > 0 ? 'danger' : 'success'} />
+                    <StatCard
+                        label={`Opening balance · ${formatDate(from)}`}
+                        value={formatCents(statement.opening_cents)}
+                        icon={Scale}
+                        tone="brand"
+                    />
+                    <StatCard
+                        label={`Closing balance · ${formatDate(to)}`}
+                        value={formatCents(statement.closing_cents)}
+                        icon={Scale}
+                        tone={statement.closing_cents > 0 ? 'danger' : 'success'}
+                    />
                 </div>
 
                 <div className="surface overflow-x-auto">
@@ -92,7 +110,9 @@ export default function AccountStatement({ account, from, to, statement }: Props
                                         <span className="capitalize">{row.type}</span>
                                         {row.memo && <span className="text-muted-foreground"> — {row.memo}</span>}
                                     </td>
-                                    <td className={cn('px-4 py-3 text-right font-mono', row.amount_cents < 0 ? 'text-success' : '')}>{formatCents(row.amount_cents)}</td>
+                                    <td className={cn('px-4 py-3 text-right font-mono', row.amount_cents < 0 ? 'text-success' : '')}>
+                                        {formatCents(row.amount_cents)}
+                                    </td>
                                     <td className="px-4 py-3 text-right font-mono">{formatCents(row.balance_cents)}</td>
                                 </tr>
                             ))}

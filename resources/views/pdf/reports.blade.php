@@ -5,7 +5,7 @@
         ? 'All accessible properties'
         : $properties->firstWhere('id', $filters['property_id'])?->name;
     $agingBuckets = ['current', '1-30', '31-60', '61-90', '90+'];
-    $logo = 'data:image/png;base64,'.base64_encode((string) @file_get_contents(resource_path('img/jt-logo-horizontal-pdf.png')));
+    $logo = 'data:image/png;base64,'.base64_encode((string) @file_get_contents(resource_path('img/mubarak-logo-horizontal-pdf.png')));
 @endphp
 <!doctype html>
 <html lang="en">
@@ -16,10 +16,10 @@
         @page { size: A4 landscape; }
         * { box-sizing: border-box; }
         body { margin: 0; color: #142638; font: 10px/1.4 Arial, sans-serif; }
-        .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #007a69; padding-bottom: 12px; }
+        .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0B7A48; padding-bottom: 12px; }
         .logo { width: 170px; max-height: 50px; object-fit: contain; object-position: left center; }
-        h1 { margin: 15px 0 2px; color: #064578; font-size: 23px; }
-        h2 { margin: 20px 0 8px; color: #064578; font-size: 14px; }
+        h1 { margin: 15px 0 2px; color: #0B3466; font-size: 23px; }
+        h2 { margin: 20px 0 8px; color: #0B3466; font-size: 14px; }
         .muted { color: #52637a; }
         .period { text-align: right; }
         .metrics { display: flex; gap: 8px; margin-top: 15px; }
@@ -27,10 +27,10 @@
         .metric .value { display: block; margin-top: 4px; font-size: 14px; font-weight: bold; white-space: nowrap; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         th, td { padding: 6px 5px; border-bottom: 1px solid #dce5ee; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
-        th { background: #064578; color: white; }
+        th { background: #0B3466; color: white; }
         thead { display: table-header-group; }
         tr { break-inside: avoid; }
-        tfoot td { background: #e6f7f3; font-weight: bold; }
+        tfoot td { background: #E6F4EC; font-weight: bold; }
         .num { text-align: right; white-space: nowrap; }
         .empty { padding: 10px 0; color: #52637a; }
         .section { break-inside: avoid-page; }
@@ -39,7 +39,7 @@
 </head>
 <body>
     <div class="header">
-        <img class="logo" src="{{ $logo }}" alt="JT Property Management">
+        <img class="logo" src="{{ $logo }}" alt="Mubarak Boardinghouse">
         <div class="period"><strong>{{ $selectedProperty }}</strong><br>{{ \Illuminate\Support\Carbon::parse($filters['month'].'-01')->format('F Y') }}<br><span class="muted">Generated {{ today()->format('d M Y') }}</span></div>
     </div>
     <h1>Management reports</h1>

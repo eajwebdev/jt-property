@@ -25,6 +25,7 @@ import {
     Lock,
     Mail,
     MailCheck,
+    Printer,
     RotateCw,
     Search,
     Send,
@@ -415,6 +416,21 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                                 rel="noopener noreferrer"
                             >
                                 <FileDown /> Statement of Accounts
+                            </a>
+                        </Button>
+                    )}
+                    {billed.length > 0 && (
+                        <Button
+                            asChild
+                            variant="outline"
+                            title={`All ${billed.length} billing statements of ${months[month - 1]} in one PDF, one per page`}
+                        >
+                            <a
+                                href={route('billing.month-statements', { year, month, property_id: filters.property_id ?? undefined })}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                <Printer /> All statements ({billed.length})
                             </a>
                         </Button>
                     )}

@@ -19,6 +19,8 @@ export interface NavItem {
     url: string;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    /** One plain sentence shown as a tooltip: what this page is for. */
+    hint?: string;
 }
 
 export interface SharedData {
@@ -36,8 +38,6 @@ export interface PropertySummary {
     code: string;
     type: string;
     address: string;
-    cover: string | null;
-    show_on_website: boolean;
     rooms: number;
     capacity: number;
     occupied: number;
@@ -52,15 +52,6 @@ export interface PropertyDetail {
     address: string;
     description: string | null;
     amenities: string | null;
-    show_on_website: boolean;
-}
-
-export interface PropertyPhoto {
-    id: number;
-    url: string;
-    caption: string | null;
-    width: number | null;
-    height: number | null;
 }
 
 export interface UnitRow {

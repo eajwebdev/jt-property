@@ -35,7 +35,7 @@ class UtilityController extends Controller
         $units = Unit::query()
             ->when($user->role === Role::Staff, fn ($q) => $q->whereIn('property_id', $user->properties()->select('properties.id')))
             ->with(['property:id,name,code', 'agreements' => fn ($q) => $q->currentOrFuture()->whereDoesntHave('replacedBy')->with(['bed:id,label', 'billingAccount.payer:id,full_name'])])
-            ->orderBy('property_id')->orderBy('code')
+            ->orderBy('property_id')->orderBy('building')->orderByRaw('LENGTH(code)')->orderBy('code')
             ->get();
 
         $configs = UnitUtility::with('shares')->whereIn('unit_id', $units->modelKeys())->get()->groupBy('unit_id');
@@ -78,6 +78,9 @@ class UtilityController extends Controller
                 return [
                     'id' => $unit->id,
                     'code' => $unit->code,
+                    'building' => $unit->building,
+                    'floor' => $unit->floor,
+                    'capacity' => $unit->capacity,
                     'property' => $unit->property->name,
                     'per_bed' => $unit->rent_mode === RentMode::PerBed,
                     'can_enter' => $user->can('enterUtilities', $unit),
@@ -142,6 +145,6 @@ class UtilityController extends Controller
             ]);
         });
 
-        return back()->with('success', ucfirst($type)." setup for Room {$unit->code} was saved.");
+        return back()->with('success', ucfirst($type)." setup for {$unit->label} was saved.");
     }
 }

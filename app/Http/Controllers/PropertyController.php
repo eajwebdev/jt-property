@@ -9,9 +9,7 @@ use App\Http\Requests\StorePropertyRequest;
 use App\Http\Requests\UpdatePropertyRequest;
 use App\Models\Occupancy;
 use App\Models\Property;
-use App\Models\PropertyPhoto;
 use App\Models\User;
-use App\Services\PropertyPhotoService;
 use App\Support\Audit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,7 +28,7 @@ class PropertyController extends Controller
         $query = $user->role === Role::Staff ? $user->properties() : Property::query();
 
         $properties = $query
-            ->with(['photos', 'units' => fn ($q) => $q->withCount(['occupancies as occupied_count' => fn ($o) => $o->activeOn(today())])])
+            ->with(['units' => fn ($q) => $q->withCount(['occupancies as occupied_count' => fn ($o) => $o->activeOn(today())])])
             ->orderBy('name')
             ->get()
             ->map(fn (Property $property) => [
@@ -39,8 +37,6 @@ class PropertyController extends Controller
                 'code' => $property->code,
                 'type' => $property->type->value,
                 'address' => $property->address,
-                'cover' => $property->photos->first()?->url(),
-                'show_on_website' => $property->show_on_website,
                 'rooms' => $property->units->count(),
                 'capacity' => $property->units->sum('capacity'),
                 'occupied' => $property->units->sum('occupied_count'),
@@ -118,9 +114,7 @@ class PropertyController extends Controller
         $canManage = request()->user()->can('update', $property);
 
         return Inertia::render('properties/show', [
-            'property' => array_merge($property->only(['id', 'name', 'code', 'address', 'description', 'amenities', 'show_on_website']), ['type' => $property->type->value]),
-            'photos' => $property->photos()->get()->map(fn (PropertyPhoto $photo) => $photo->toCard())->values(),
-            'maxPhotos' => PropertyPhotoService::MAX_PHOTOS,
+            'property' => array_merge($property->only(['id', 'name', 'code', 'address', 'description', 'amenities']), ['type' => $property->type->value]),
             'units' => $units,
             'staff' => $canManage ? $property->users()->orderBy('name')->get(['users.id', 'users.name']) : [],
             'canManage' => $canManage,
@@ -181,7 +175,7 @@ class PropertyController extends Controller
     {
         return [
             'property' => $property->exists
-                ? array_merge($property->only(['id', 'name', 'code', 'address', 'dti_registration_no', 'business_permit_no', 'description', 'amenities', 'auto_send_email', 'show_on_website']), ['type' => $property->type->value, 'has_billing' => $property->billingAccounts()->exists()])
+                ? array_merge($property->only(['id', 'name', 'code', 'address', 'dti_registration_no', 'business_permit_no', 'description', 'amenities', 'auto_send_email']), ['type' => $property->type->value, 'has_billing' => $property->billingAccounts()->exists()])
                 : null,
             'staff_ids' => $selected,
             'types' => collect(PropertyType::cases())->map->value,

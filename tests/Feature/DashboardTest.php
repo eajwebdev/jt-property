@@ -15,9 +15,16 @@ class DashboardTest extends TestCase
         $this->get('/dashboard')->assertRedirect('/login');
     }
 
-    public function test_home_is_the_public_landing_page()
+    public function test_home_sends_guests_to_the_login_page()
     {
-        $this->get('/')->assertOk()->assertInertia(fn ($page) => $page->component('welcome'));
+        $this->get('/')->assertRedirect(route('login'));
+    }
+
+    public function test_home_sends_signed_in_users_to_the_dashboard()
+    {
+        $this->actingAs(User::factory()->create());
+
+        $this->get('/')->assertRedirect(route('dashboard'));
     }
 
     public function test_authenticated_users_can_visit_the_dashboard()
@@ -25,5 +32,14 @@ class DashboardTest extends TestCase
         $this->actingAs($user = User::factory()->create());
 
         $this->get('/dashboard')->assertOk();
+    }
+
+    public function test_monthly_guide_flowchart_is_shown_to_signed_in_users_only()
+    {
+        $this->get('/guide')->assertRedirect('/login');
+
+        $this->actingAs(User::factory()->create());
+
+        $this->get('/guide')->assertOk()->assertInertia(fn ($page) => $page->component('guide'));
     }
 }

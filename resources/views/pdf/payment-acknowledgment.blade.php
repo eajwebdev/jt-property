@@ -1,6 +1,6 @@
 @php
     use App\Support\Money;
-    $logo = 'data:image/png;base64,'.base64_encode((string) @file_get_contents(resource_path('img/jt-logo-horizontal-pdf.png')));
+    $logo = 'data:image/png;base64,'.base64_encode((string) @file_get_contents(resource_path('img/mubarak-logo-horizontal-pdf.png')));
 @endphp
 <!doctype html>
 <html lang="en">
@@ -11,13 +11,13 @@
         @page { size: A4; }
         * { box-sizing: border-box; }
         body { margin: 0; color: #0f1e2e; font: 12px/1.55 Arial, sans-serif; }
-        .top { display: flex; justify-content: space-between; align-items: start; border-bottom: 4px solid #007a69; padding-bottom: 20px; }
+        .top { display: flex; justify-content: space-between; align-items: start; border-bottom: 4px solid #0B7A48; padding-bottom: 20px; }
         .logo { max-width: 220px; max-height: 65px; }
-        h1 { color: #064578; font-size: 23px; margin: 25px 0 4px; }
+        h1 { color: #0B3466; font-size: 23px; margin: 25px 0 4px; }
         .muted { color: #52637a; }
         .number { font-size: 16px; font-weight: bold; }
-        .amount { background: #e6f7f3; padding: 18px; border-radius: 8px; margin: 22px 0; }
-        .amount b { color: #064578; font-size: 27px; }
+        .amount { background: #E6F4EC; padding: 18px; border-radius: 8px; margin: 22px 0; }
+        .amount b { color: #0B3466; font-size: 27px; }
         table { border-collapse: collapse; width: 100%; }
         th, td { border-bottom: 1px solid #dce5ee; text-align: left; padding: 10px 4px; vertical-align: top; }
         th { width: 35%; color: #52637a; font-weight: normal; }
@@ -28,7 +28,7 @@
 </head>
 <body>
     <div class="top">
-        <div><img class="logo" src="{{ $logo }}" alt="JT Property Management"><div>{{ $company['company_name'] }}</div><div class="muted">{{ $company['company_address'] }}</div></div>
+        <div><img class="logo" src="{{ $logo }}" alt="Mubarak Boardinghouse"><div>{{ $company['company_name'] }}</div><div class="muted">{{ $company['company_address'] }}</div></div>
         <div style="text-align:right"><div class="number">{{ $payment->ack_number }}</div><div>{{ $payment->paid_on->format('d M Y') }}</div></div>
     </div>
     <h1>Payment acknowledgment</h1>

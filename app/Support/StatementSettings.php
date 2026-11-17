@@ -14,7 +14,7 @@ final class StatementSettings
     public static function get(): array
     {
         $defaults = [
-            'company_name' => 'JT Property Management',
+            'company_name' => 'Mubarak Boardinghouse',
             'company_address' => '',
             'company_phone' => '',
             'company_email' => '',

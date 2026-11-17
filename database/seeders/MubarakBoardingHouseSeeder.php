@@ -95,7 +95,6 @@ class MubarakBoardingHouseSeeder extends Seeder
             'address' => 'Purok CPSU Uno, Barangay Camingawan, Kabankalan City',
             'dti_registration_no' => '1366594',
             'description' => "Creekside House, BIND House, Jerry's House (Main and Annex) and Main House.",
-            'show_on_website' => false,
         ]);
 
         // Sections exactly as on the sheet. A boarder on both lists (SHANGCO: current room + an old unpaid stay)

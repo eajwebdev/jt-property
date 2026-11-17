@@ -16,7 +16,7 @@ export default function AuthSimpleLayout({ children, title, description }: AuthL
                         <Link href={route('home')} className="flex flex-col items-center gap-2 font-medium">
                             {/* horizontal logo has a light background; the white panel keeps it clean in dark mode */}
                             <div className="mb-1 rounded-xl bg-white px-3 py-2 shadow-sm dark:ring-1 dark:ring-white/10">
-                                <img src="/branding/jt-logo-horizontal.webp" alt="JT Property Management System" className="h-16 w-auto" />
+                                <img src="/branding/mubarak-logo-horizontal.webp" alt="Mubarak Boardinghouse" className="h-16 w-auto" />
                             </div>
                             <span className="sr-only">{title}</span>
                         </Link>
