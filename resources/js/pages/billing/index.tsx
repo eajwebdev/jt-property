@@ -61,8 +61,8 @@ interface Row {
     invoice_number: string | null;
     invoice_id: number | null;
     email_status: 'queued' | 'sent' | 'skipped' | 'failed' | null;
-    /** Electricity is required on every bill: on_bill, next_bill (entered after the bill was made) or missing. */
-    electricity: 'on_bill' | 'next_bill' | 'missing';
+    /** From the room's bill on the Electricity screen: on_bill, next_bill (entered after this bill was made), missing, or included (nothing to enter). */
+    electricity: 'on_bill' | 'next_bill' | 'missing' | 'included';
     electricity_cents: number;
 }
 interface Props {
@@ -129,60 +129,6 @@ function flagText(flag: string): string | null {
         default:
             return null;
     }
-}
-
-/** Type one tenant's electric bill for the month. Goes on this month's bill, or the next one if this bill is already made. */
-function ElectricityForm({ row, year, month, onDone }: { row: Row; year: number; month: number; onDone: () => void }) {
-    const usage = new Date(year, month - 2, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' });
-    const billed = row.status === 'already_billed';
-    const form = useForm({
-        rental_agreement_id: row.agreement_id,
-        year,
-        month,
-        amount: row.electricity_cents > 0 ? (row.electricity_cents / 100).toFixed(2) : '',
-    });
-    return (
-        <form
-            className="grid gap-4"
-            onSubmit={(e) => {
-                e.preventDefault();
-                form.post(route('billing.electricity'), { preserveScroll: true, onSuccess: onDone });
-            }}
-        >
-            <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                    <Zap className="text-warning size-5" aria-hidden /> Electric bill
-                </DialogTitle>
-                <DialogDescription>
-                    {row.tenant} · {row.unit}
-                </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-2">
-                <Label htmlFor="eb-amount">Electricity for {usage} (pesos)</Label>
-                <Input
-                    id="eb-amount"
-                    inputMode="decimal"
-                    placeholder="e.g. 72.23"
-                    value={form.data.amount}
-                    onChange={(e) => form.setData('amount', e.target.value)}
-                    autoFocus
-                    required
-                />
-                <InputError message={form.errors.amount} />
-                <p className="text-muted-foreground text-xs">
-                    {billed
-                        ? 'This month is already billed, so it is added to the next bill as "(entered late)".'
-                        : `Added to the ${new Date(year, month - 1, 1).toLocaleDateString('en-PH', { month: 'long' })} bill when you generate.`}
-                </p>
-            </div>
-            <DialogFooter>
-                <Button type="button" variant="outline" onClick={onDone}>
-                    Cancel
-                </Button>
-                <Button disabled={form.processing}>Save electric bill</Button>
-            </DialogFooter>
-        </form>
-    );
 }
 
 /** Deletes (voids) every bill of the latest billed month so it can be generated again. A reason is required and kept. */
@@ -262,7 +208,6 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
     const [status, setStatus] = useState<StatusFilter>('all');
     const [search, setSearch] = useState('');
     const [open, setOpen] = useState<number | null>(null);
-    const [entering, setEntering] = useState<Row | null>(null);
 
     // Generate bills every active tenant of the month: no picking.
     const ready = rows.filter((r) => r.status === 'eligible');
@@ -535,7 +480,7 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                         </div>
 
                         <div className="max-h-[calc(100dvh-20rem)] min-h-64 overflow-auto">
-                            <table className="w-full min-w-[860px] text-sm">
+                            <table className="w-full min-w-[960px] text-sm">
                                 <caption className="sr-only">
                                     Bills for {months[month - 1]} {year}
                                 </caption>
@@ -543,9 +488,16 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                                     <tr className="border-b">
                                         <th className="px-3 py-2">Tenant / room</th>
                                         <th className="px-2 py-2">Due</th>
-                                        <th className="px-2 py-2 text-right">Previous</th>
+                                        <th className="px-2 py-2 text-right" title="Unpaid (or credit, shown with a minus) from earlier bills">
+                                            Previous
+                                        </th>
+                                        <th className="px-2 py-2 text-right" title="Payments and credits received since this billing period started">
+                                            Paid / credits
+                                        </th>
                                         <th className="px-2 py-2 text-right">New charges</th>
-                                        <th className="px-2 py-2 text-right">Total due</th>
+                                        <th className="px-2 py-2 text-right" title="Previous + Paid / credits + New charges">
+                                            Total due
+                                        </th>
                                         <th className="px-2 py-2">Status</th>
                                         <th className="w-28 px-3 py-2">
                                             <span className="sr-only">Actions</span>
@@ -571,8 +523,17 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                                                         </button>
                                                     </td>
                                                     <td className="px-2 py-2 text-xs whitespace-nowrap">{formatDate(r.due_date)}</td>
-                                                    <td className="px-2 py-2 text-right font-mono whitespace-nowrap">
+                                                    <td
+                                                        className={cn(
+                                                            'px-2 py-2 text-right font-mono whitespace-nowrap',
+                                                            r.previous_balance_cents < 0 && 'text-success',
+                                                        )}
+                                                        title={r.previous_balance_cents < 0 ? 'Credit from an earlier overpayment' : undefined}
+                                                    >
                                                         {r.previous_balance_cents !== 0 ? formatCents(r.previous_balance_cents) : '—'}
+                                                    </td>
+                                                    <td className="text-success px-2 py-2 text-right font-mono whitespace-nowrap">
+                                                        {r.payments_since_cents !== 0 ? formatCents(r.payments_since_cents) : '—'}
                                                     </td>
                                                     <td className="px-2 py-2 text-right font-mono whitespace-nowrap">
                                                         {formatCents(r.current_charges_cents)}
@@ -589,7 +550,7 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                                                             {r.electricity === 'missing' && (
                                                                 <Badge
                                                                     variant="warning"
-                                                                    title="Electricity is required. Click ⚡ to enter this tenant's electric bill."
+                                                                    title="This room's electric bill is not entered yet. Click ⚡ to enter it on the Electricity screen."
                                                                 >
                                                                     <Zap className="size-3" aria-hidden /> No electric bill yet
                                                                 </Badge>
@@ -622,16 +583,23 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                                                     </td>
                                                     <td className="px-3 py-2">
                                                         <div className="flex items-center justify-end gap-1">
-                                                            {canGenerate && r.electricity !== 'on_bill' && (
+                                                            {r.electricity === 'missing' && (
                                                                 <Button
+                                                                    asChild
                                                                     variant="ghost"
                                                                     size="icon"
-                                                                    className={cn('size-8', r.electricity === 'missing' && 'text-warning')}
-                                                                    title="Enter electric bill"
-                                                                    aria-label={`Enter electric bill for ${r.tenant}`}
-                                                                    onClick={() => setEntering(r)}
+                                                                    className="text-warning size-8"
+                                                                    title="Enter this room's electric bill (Electricity screen)"
                                                                 >
-                                                                    <Zap />
+                                                                    <Link
+                                                                        href={route('utilities.index', {
+                                                                            month: `${year}-${String(month).padStart(2, '0')}`,
+                                                                            q: r.tenant,
+                                                                        })}
+                                                                        aria-label={`Enter the electric bill of ${r.tenant}'s room`}
+                                                                    >
+                                                                        <Zap />
+                                                                    </Link>
                                                                 </Button>
                                                             )}
                                                             {r.invoice_id && (
@@ -703,7 +671,7 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                                                 </tr>
                                                 {isOpen && (
                                                     <tr className="bg-muted/30 border-b">
-                                                        <td colSpan={7} className="px-3 py-3">
+                                                        <td colSpan={8} className="px-3 py-3">
                                                             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                                                                 <div>
                                                                     <p className="text-muted-foreground mb-1 text-xs">
@@ -771,7 +739,7 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                                     })}
                                     {visible.length === 0 && (
                                         <tr>
-                                            <td colSpan={7} className="text-muted-foreground px-3 py-8 text-center">
+                                            <td colSpan={8} className="text-muted-foreground px-3 py-8 text-center">
                                                 No tenants match.
                                             </td>
                                         </tr>
@@ -801,8 +769,9 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                     {readyPending > 0 && (
                         <p className="bg-warning/10 text-warning flex gap-2 rounded-lg p-3 text-sm">
                             <Zap className="mt-0.5 size-4 shrink-0" aria-hidden />
-                            {readyPending} {readyPending === 1 ? 'bill has' : 'bills have'} no electric bill entered yet. They will show "not yet
-                            entered"; the electricity is added to the next bill once you enter it.
+                            {readyPending} {readyPending === 1 ? 'bill has' : 'bills have'} no electricity yet: the room's electric bill is not
+                            entered on the Electricity screen. They will show "not yet entered"; the share is added to the next bill once you enter
+                            it.
                         </p>
                     )}
                     <DialogFooter>
@@ -828,12 +797,6 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                             onDone={() => setDeleting(false)}
                         />
                     )}
-                </DialogContent>
-            </Dialog>
-
-            <Dialog open={entering !== null} onOpenChange={(o) => !o && setEntering(null)}>
-                <DialogContent className="sm:max-w-md">
-                    {entering && <ElectricityForm row={entering} year={year} month={month} onDone={() => setEntering(null)} />}
                 </DialogContent>
             </Dialog>
 

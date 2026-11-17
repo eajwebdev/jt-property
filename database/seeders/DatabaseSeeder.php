@@ -10,9 +10,7 @@ use RuntimeException;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the owner and staff demo logins.
-     */
+    /** Seed the owner login, and a staff login for local development and tests. */
     public function run(): void
     {
         $password = config('app.seed_password');
@@ -25,12 +23,15 @@ class DatabaseSeeder extends Seeder
             $password = 'password';
         }
 
-        $demo = [
-            ['Owner Demo', 'owner@jt', Role::Owner],
-            ['Staff Demo', 'staff@jt', Role::Staff],
+        $users = [
+            [app()->environment('local', 'testing') ? 'Owner Demo' : 'Owner', 'owner@jt', Role::Owner],
         ];
 
-        foreach ($demo as [$name, $email, $role]) {
+        if (app()->environment('local', 'testing')) {
+            $users[] = ['Staff Demo', 'staff@jt', Role::Staff];
+        }
+
+        foreach ($users as [$name, $email, $role]) {
             $user = User::firstOrCreate(['email' => $email], [
                 'name' => $name,
                 'role' => $role,

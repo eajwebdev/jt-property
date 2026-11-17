@@ -191,6 +191,16 @@ function ReadingDialog({ unit, type, month, onClose }: { unit: UnitRow; type: Ut
                                 placeholder="Like 1,250.50"
                             />
                             <p className="text-muted-foreground text-sm">{amountCents ? formatCents(amountCents) : 'Like 1000 or 1,250.50'}</p>
+                            {u.split_method === 'equal' && unit.agreements.length > 0 && (
+                                <p className="bg-accent text-accent-foreground rounded-lg p-3 text-sm" aria-live="polite">
+                                    {amountCents
+                                        ? `${formatCents(amountCents)} ÷ ${unit.agreements.length} ${unit.agreements.length === 1 ? 'boarder' : 'boarders'} = about ${formatCents(Math.floor(amountCents / unit.agreements.length))} each`
+                                        : `Split equally between the ${unit.agreements.length} ${unit.agreements.length === 1 ? 'boarder' : 'boarders'} in this room.`}
+                                    <span className="mt-1 block text-xs opacity-80">
+                                        Counted on the bills by who stayed this month; any leftover centavo goes to one boarder so nothing is lost.
+                                    </span>
+                                </p>
+                            )}
                             <InputError message={errors.amount} />
                         </div>
                     )}
@@ -444,7 +454,8 @@ export default function Utilities({ month, canConfigure, units }: Props) {
     const [entering, setEntering] = useState<{ unit: UnitRow; type: UtilityType } | null>(null);
     const [configuring, setConfiguring] = useState<{ unit: UnitRow; type: UtilityType } | null>(null);
     const [show, setShow] = useState<'all' | 'missing'>('all');
-    const [search, setSearch] = useState('');
+    // ⚡ on the Bills screen links here with ?q=<boarder> so their room is the one shown.
+    const [search, setSearch] = useState(() => (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('q') ?? '') : ''));
 
     const stages = units.map((u) => stageOf(u.utilities.electricity));
     const count = (stage: ReturnType<typeof stageOf>) => stages.filter((s) => s === stage).length;
@@ -483,7 +494,7 @@ export default function Utilities({ month, canConfigure, units }: Props) {
                 <PageHeader
                     icon={Zap}
                     title="Electricity"
-                    description="Rooms with their own meter or a shared bill: enter this month's reading here. A boarder's own electric bill amount is typed on the Bills screen (⚡). Water is free."
+                    description="The only place electricity comes from: type each room's electric bill for the month and it is split equally between the boarders in that room (₱1,000 ÷ 4 = ₱250 each). Settings changes how a room pays. Water is free."
                     actions={
                         <Button asChild variant="outline">
                             <Link href={route('billing.index')}>

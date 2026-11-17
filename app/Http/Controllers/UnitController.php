@@ -7,6 +7,7 @@ use App\Http\Requests\StoreUnitRequest;
 use App\Http\Requests\UpdateUnitRequest;
 use App\Models\Property;
 use App\Models\Unit;
+use App\Models\UnitUtility;
 use App\Support\Audit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,8 @@ class UnitController extends Controller
         $unit = DB::transaction(function () use ($request, $property) {
             $unit = $property->units()->create($request->validated());
             $this->syncBeds($unit);
+            // Default: one electric bill per room each month, split equally between the boarders (changeable on Electricity).
+            UnitUtility::create(['unit_id' => $unit->id, 'type' => 'electricity', 'mode' => 'shared', 'split_method' => 'equal']);
             Audit::log('unit.created', $unit, ['new' => $request->validated()]);
 
             return $unit;

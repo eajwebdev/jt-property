@@ -89,7 +89,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('billing/batches/{batch}/combined.pdf', [BillingController::class, 'combinedBatch'])->name('billing.batches.combined');
     Route::post('billing/batches/{batch}/email', [BillingController::class, 'emailBatch'])->name('billing.batches.email');
     Route::post('billing/void-month', [BillingController::class, 'voidMonth'])->name('billing.void-month');
-    Route::post('billing/electricity', [BillingController::class, 'electricity'])->name('billing.electricity');
     Route::post('billing/email-month', [BillingController::class, 'emailMonth'])->name('billing.email-month');
     Route::post('billing/test-email', [BillingController::class, 'testEmail'])->middleware('throttle:3,1')->name('billing.test-email');
     Route::post('billing/batch-items/{item}/retry', [BillingController::class, 'retry'])->name('billing.items.retry');

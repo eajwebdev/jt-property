@@ -8,15 +8,13 @@ use App\Enums\LedgerEntryType;
 use App\Enums\Role;
 use App\Models\BillingBatch;
 use App\Models\BillingBatchItem;
-use App\Models\ChargeCategory;
 use App\Models\EmailDelivery;
 use App\Models\Invoice;
 use App\Models\LedgerEntry;
-use App\Models\OneTimeCharge;
 use App\Models\Property;
 use App\Models\RentalAgreement;
-use App\Rules\Pesos;
 use App\Services\Billing\BatchExportService;
+use App\Services\Billing\BillingCycleResolver;
 use App\Services\Billing\BillingEmailService;
 use App\Services\Billing\BillingPreviewService;
 use App\Services\Billing\InvoiceGenerationService;
@@ -24,8 +22,8 @@ use App\Services\Billing\InvoiceStatusService;
 use App\Services\Billing\PaymentService;
 use App\Services\Billing\PreviewRow;
 use App\Services\Billing\ReceivableLedgerService;
+use App\Services\Billing\UtilityAllocationService;
 use App\Support\Audit;
-use App\Support\Money;
 use App\Support\Quantity;
 use App\Support\Settings;
 use Illuminate\Database\Eloquent\Builder;
@@ -39,7 +37,6 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -87,10 +84,6 @@ class BillingController extends Controller
         $invoiceIds = Invoice::whereIn('number', $numbers)->pluck('id', 'number');
         // Latest email delivery per bill: sent / queued / skipped / failed (none = never sent).
         $emails = EmailDelivery::whereIn('invoice_id', $invoiceIds->values())->orderBy('id')->get(['invoice_id', 'status'])->keyBy('invoice_id')->map->status;
-        // Electricity typed after this month's bill was made: waiting for the next bill.
-        $late = OneTimeCharge::whereNull('invoice_id')->where('label', 'like', 'Electricity – %(entered late)')
-            ->whereDate('bill_month', Carbon::create($year, $month, 1)->addMonthNoOverflow()->toDateString())
-            ->get(['rental_agreement_id', 'amount_cents'])->keyBy('rental_agreement_id');
         // Closed: a later month is already billed (its bills carry this month's balance). View, print and email only.
         $scope = collect($this->properties($request))->pluck('id')->when($propertyId, fn ($c, $id) => $c->intersect([(int) $id]))->values()->all();
         $laterMonth = Invoice::where('status', InvoiceStatus::Finalized)->whereIn('property_id', $scope)
@@ -104,7 +97,7 @@ class BillingController extends Controller
             'properties' => $this->properties($request),
             'rows' => array_map(fn (PreviewRow $r) => $this->previewRow($r, $invoiceIds) + [
                 'email_status' => ($id = $invoiceIds[$r->invoiceNumber] ?? null) ? ($emails[$id] ?? null) : null,
-            ] + $this->electricityOf($r, $late), $result['rows']),
+            ] + $this->electricityOf($r, $year, $month), $result['rows']),
             'summary' => $result['summary'],
             'canGenerate' => $user->can('owner') && $closedBy === null,
             'closedBy' => $closedBy,
@@ -125,78 +118,35 @@ class BillingController extends Controller
     }
 
     /**
-     * The tenant's electric bill for a billing month, typed on the billing screen. Stored as one "Electricity"
-     * one-time charge labelled with the usage month (the month before: the November bill carries October's EB).
-     * Bill not made yet: it goes on this month's bill. Bill already made: it goes on the next bill, "(entered late)".
-     * Typing it again before it is billed replaces the amount.
-     */
-    public function electricity(Request $request): RedirectResponse
-    {
-        Gate::authorize('owner');
-        $data = $request->validate([
-            'rental_agreement_id' => ['required', 'integer', 'exists:rental_agreements,id'],
-            'year' => ['required', 'integer', 'between:2000,2100'],
-            'month' => ['required', 'integer', 'between:1,12'],
-            'amount' => ['required', 'string', new Pesos('electric bill')],
-        ]);
-        $agreement = RentalAgreement::with('billingAccount')->findOrFail($data['rental_agreement_id']);
-        abort_unless($request->user()->canAccessProperty($agreement->billingAccount->property_id), 403);
-        $cents = Money::toCents($data['amount']);
-        if ($cents <= 0) {
-            throw ValidationException::withMessages(['amount' => 'Enter an electric bill above zero.']);
-        }
-
-        $month = Carbon::create((int) $data['year'], (int) $data['month'], 1)->startOfDay();
-        if (Invoice::where('rental_agreement_id', $agreement->id)->where('status', InvoiceStatus::Finalized)->whereDate('period_start', '>', $month->copy()->endOfMonth()->toDateString())->exists()) {
-            throw ValidationException::withMessages(['amount' => 'This month is closed: a later month is already billed. Enter the electric bill on the latest month.']);
-        }
-        $billed = Invoice::where('rental_agreement_id', $agreement->id)->where('status', InvoiceStatus::Finalized)
-            ->whereYear('period_start', $month->year)->whereMonth('period_start', $month->month)->exists();
-        $billMonth = $billed ? $month->copy()->addMonthNoOverflow() : $month;
-        $label = 'Electricity – '.$month->copy()->subMonthNoOverflow()->format('F Y').($billed ? ' (entered late)' : '');
-
-        $existing = OneTimeCharge::where('rental_agreement_id', $agreement->id)->where('label', $label)->first();
-        if ($existing && $existing->invoice_id !== null) {
-            throw ValidationException::withMessages(['amount' => 'This electric bill is already on a bill. Use Charges to add a correction.']);
-        }
-
-        DB::transaction(function () use ($existing, $agreement, $label, $cents, $billMonth, $request) {
-            if ($existing) {
-                $old = $existing->amount_cents;
-                $existing->update(['amount_cents' => $cents]);
-                Audit::log('one_time_charge.updated', $existing, ['old' => $old, 'new' => $cents, 'via' => 'billing electricity']);
-
-                return;
-            }
-            $charge = OneTimeCharge::create([
-                'billing_account_id' => $agreement->billing_account_id, 'rental_agreement_id' => $agreement->id,
-                'charge_category_id' => ChargeCategory::where('name', 'Electricity')->value('id'),
-                'label' => $label, 'kind' => 'charge', 'amount_cents' => $cents,
-                'bill_month' => $billMonth->toDateString(), 'created_by' => $request->user()->id,
-            ]);
-            Audit::log('one_time_charge.created', $charge, ['amount_cents' => $cents, 'via' => 'billing electricity']);
-        });
-
-        return back()->with('success', Money::format($cents).' '.$label.($billed ? ' will be on the next bill.' : ' added to this month\'s bill.'));
-    }
-
-    /**
-     * Electricity is required on every bill: on_bill (a real electricity line), next_bill (typed after the bill was
-     * made, waiting for the next one) or missing. Water is free and never counted.
+     * Where this boarder's electricity stands for the month. It comes only from the room's bill on the Electricity
+     * screen (split between the room's boarders), so it is read fresh from there:
+     * missing (room bill not entered yet), on_bill (this boarder's share is on the bill), next_bill (entered after
+     * this bill was made: it goes on the next bill, "entered late"), included (nothing to enter for this room,
+     * e.g. included in rent). Water is free and never counted.
      *
      * @return array{electricity: string, electricity_cents: int}
      */
-    private function electricityOf(PreviewRow $r, Collection $late): array
+    private function electricityOf(PreviewRow $r, int $year, int $month): array
     {
-        $cents = collect($r->lines)->filter(fn ($l) => str_starts_with($l['label'], 'Electricity') && $l['category'] !== 'utility_pending' && $l['amount_cents'] > 0)->sum('amount_cents');
-        if ($cents > 0) {
-            return ['electricity' => 'on_bill', 'electricity_cents' => (int) $cents];
-        }
-        if ($late->has($r->agreementId)) {
-            return ['electricity' => 'next_bill', 'electricity_cents' => (int) $late[$r->agreementId]->amount_cents];
+        $agreement = RentalAgreement::find($r->agreementId);
+        $cycle = $agreement ? app(BillingCycleResolver::class)->cycleFor($agreement, $year, $month) : null;
+        if ($cycle === null) {
+            return ['electricity' => 'included', 'electricity_cents' => 0];
         }
 
-        return ['electricity' => 'missing', 'electricity_cents' => 0];
+        $now = app(UtilityAllocationService::class)->linesFor($agreement, $cycle);
+        if (in_array('electricity', $now['needs_input'], true)) {
+            return ['electricity' => 'missing', 'electricity_cents' => 0];
+        }
+        $share = (int) $now['lines']->where('type', 'electricity')->sum('amount_cents');
+        if ($share <= 0) {
+            return ['electricity' => 'included', 'electricity_cents' => 0];
+        }
+        // Already billed while the room bill was still missing: the share goes on the next bill.
+        $billedWithout = $r->status === 'already_billed'
+            && collect($r->lines)->contains(fn ($l) => $l['category'] === 'utility_pending' && str_starts_with($l['label'], 'Electricity'));
+
+        return ['electricity' => $billedWithout ? 'next_bill' : 'on_bill', 'electricity_cents' => $share];
     }
 
     /**

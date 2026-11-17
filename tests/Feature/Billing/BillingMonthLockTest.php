@@ -6,13 +6,14 @@ use App\Enums\InvoiceStatus;
 use App\Enums\RentMode;
 use App\Models\BillingAccount;
 use App\Models\Invoice;
-use App\Models\OneTimeCharge;
 use App\Models\Property;
 use App\Models\RentalAgreement;
 use App\Models\RentRate;
 use App\Models\Tenant;
 use App\Models\Unit;
+use App\Models\UnitUtility;
 use App\Models\User;
+use App\Models\UtilityBill;
 use App\Services\Billing\InvoiceGenerationService;
 use App\Services\Billing\PaymentService;
 use App\Services\Billing\ReceivableLedgerService;
@@ -52,8 +53,9 @@ class BillingMonthLockTest extends TestCase
     {
         $billing = app(InvoiceGenerationService::class);
         $billing->generate(2026, 11, $this->owner);
-        // December electricity, entered before December is billed.
-        $this->post(route('billing.electricity'), ['rental_agreement_id' => $this->ana->id, 'year' => 2026, 'month' => 12, 'amount' => '84.80'])->assertSessionHasNoErrors();
+        // December electricity: the room's bill, entered before December is billed (Ana is alone in the room).
+        UnitUtility::create(['unit_id' => $this->ana->unit_id, 'type' => 'electricity', 'mode' => 'shared', 'split_method' => 'equal']);
+        $this->post(route('utility-bills.store'), ['unit_id' => $this->ana->unit_id, 'type' => 'electricity', 'bill_month' => '2026-12', 'amount' => '84.80'])->assertSessionHasNoErrors();
         $billing->generate(2026, 12, $this->owner);
         $this->assertSame(70000 + 8480, $this->bill(12)->current_charges_cents);
         // Ana pays part of December.
@@ -64,7 +66,6 @@ class BillingMonthLockTest extends TestCase
             ->where('closedBy', 'December 2026')->where('canGenerate', false)->where('canDeleteMonth', false)->where('canEmail', true));
         $this->get(route('invoices.show', $this->bill(11)))->assertInertia(fn (Assert $p) => $p->where('canVoid', false));
         $this->post(route('invoices.void', $this->bill(11)), ['reason' => 'Trying to change November'])->assertSessionHasErrors('invoice');
-        $this->post(route('billing.electricity'), ['rental_agreement_id' => $this->ana->id, 'year' => 2026, 'month' => 11, 'amount' => '50'])->assertSessionHasErrors('amount');
         $this->post(route('billing.void-month'), ['year' => 2026, 'month' => 11, 'reason' => 'Trying to delete November'])->assertSessionHasErrors('month');
         $this->assertSame(InvoiceStatus::Finalized, $this->bill(11)->status);
 
@@ -74,7 +75,7 @@ class BillingMonthLockTest extends TestCase
         $this->post(route('billing.void-month'), ['year' => 2026, 'month' => 12, 'reason' => 'Wrong electric bills'])->assertRedirect();
 
         $this->assertSame(0, Invoice::where('rental_agreement_id', $this->ana->id)->whereMonth('period_start', 12)->where('status', InvoiceStatus::Finalized)->count());
-        $this->assertNull(OneTimeCharge::sole()->invoice_id); // electricity back to waiting
+        $this->assertSame('draft', UtilityBill::sole()->status); // the room's electricity is back to waiting
         $ledger = app(ReceivableLedgerService::class);
         $this->assertSame(70000 - 30000, $ledger->balance($this->ana->billingAccount)); // only November left; the payment is credit
         $this->get(route('billing.index', ['year' => 2026, 'month' => 11]))->assertInertia(fn (Assert $p) => $p->where('closedBy', null)); // November is the latest again

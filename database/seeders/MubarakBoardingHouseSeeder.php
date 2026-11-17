@@ -176,9 +176,9 @@ class MubarakBoardingHouseSeeder extends Seeder
             $this->opening($openings, $account, $row['breakdown'], $asOf, $row['remark'] ?: 'Previous boarder with an unpaid account.');
         }
 
-        // 5. From November each room's electric bill is entered monthly and split by days in the room.
+        // 5. From November each room's electric bill is entered monthly and split equally between its boarders.
         foreach ($units as $unit) {
-            UnitUtility::create(['unit_id' => $unit->id, 'type' => 'electricity', 'mode' => 'shared', 'split_method' => 'days']);
+            UnitUtility::create(['unit_id' => $unit->id, 'type' => 'electricity', 'mode' => 'shared', 'split_method' => 'equal']);
         }
     }
 

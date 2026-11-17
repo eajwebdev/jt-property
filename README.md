@@ -38,12 +38,12 @@ Collections provides payment posting, approval, reversals, aging, account statem
 
 ## Demo logins
 
-Created by `php artisan migrate --seed`. On this local installation, both demo accounts use password `password`. Running `php artisan db:seed` restores their passwords to the configured `SEED_PASSWORD`. The MySQL `DB_USERNAME`/`DB_PASSWORD` credentials are only for the database; they are not application logins.
+Created by `php artisan migrate --seed`. On this local installation, both demo accounts use password `password`. Running `php artisan db:seed` locally restores their passwords to the configured `SEED_PASSWORD`. Production seeding creates only the owner account and leaves an existing owner's password unchanged. The MySQL `DB_USERNAME`/`DB_PASSWORD` credentials are only for the database; they are not application logins.
 
 | Role | Email |
 |---|---|
-| Owner | owner@jt.test |
-| Staff | staff@jt.test |
+| Owner | owner@jt |
+| Staff | staff@jt |
 
 There is no public sign-up. The owner adds users under Settings > Users. Users are deactivated, never deleted, so payment and audit history stays intact (a deactivated user is signed out and cannot sign in until reactivated).
 
@@ -61,7 +61,7 @@ Tests use the `jt_property_test` database through `phpunit.xml`. Clear cached co
 
 ## Production readiness checklist
 
-- [ ] Use a dedicated production database account and run `php artisan migrate --force`; verify database backups and a restore on a separate database.
+- [ ] Use a dedicated production database account, set `SEED_PASSWORD`, then run `php artisan migrate --force` and `php artisan db:seed --force` to create `owner@jt`; verify database backups and a restore on a separate database.
 - [ ] Set `APP_ENV=production`, `APP_DEBUG=false`, a secure `APP_KEY`, HTTPS, secure cookies, and a private writable `storage` directory.
 - [ ] Configure a real SMTP provider and verified sender; send a test email. Keep automatic sending disabled until this succeeds.
 - [ ] Run a supervised queue worker and scheduler continuously. Check failed jobs and the billing operations panel.

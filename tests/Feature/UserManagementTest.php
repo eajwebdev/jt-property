@@ -26,7 +26,7 @@ class UserManagementTest extends TestCase
             $this->assertStringContainsString('SEED_PASSWORD', $e->getMessage());
         }
 
-        $this->assertDatabaseMissing('users', ['email' => 'owner@jt.test']);
+        $this->assertDatabaseMissing('users', ['email' => 'owner@jt']);
     }
 
     private function payload(array $overrides = []): array
@@ -107,10 +107,25 @@ class UserManagementTest extends TestCase
     {
         $this->seed();
 
-        $this->post('/login', ['email' => User::where('role', 'owner')->orderBy('id')->value('email'), 'password' => config('app.seed_password') ?: 'password']);
+        $this->post('/login', ['email' => 'owner@jt', 'password' => config('app.seed_password') ?: 'password'])
+            ->assertRedirect(route('dashboard', absolute: false));
 
         $this->assertAuthenticated();
         $this->assertTrue(auth()->user()->isOwner());
+    }
+
+    public function test_production_seed_creates_only_the_owner_and_allows_login(): void
+    {
+        $this->app['env'] = 'production';
+        config(['app.seed_password' => 'Production-Seed-Password-123']);
+
+        (new DatabaseSeeder)->run();
+
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseHas('users', ['email' => 'owner@jt', 'role' => 'owner']);
+        $this->post('/login', ['email' => 'owner@jt', 'password' => 'Production-Seed-Password-123'])
+            ->assertRedirect(route('dashboard', absolute: false));
+        $this->assertAuthenticatedAs(User::where('email', 'owner@jt')->firstOrFail());
     }
 
     public function test_seeded_staff_can_log_in_and_only_two_demo_accounts_exist(): void

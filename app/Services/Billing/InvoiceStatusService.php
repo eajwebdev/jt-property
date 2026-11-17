@@ -29,7 +29,8 @@ class InvoiceStatusService
 
         $charge = LedgerEntry::where('invoice_id', $invoice->id)->where('type', LedgerEntryType::Charge)->orderBy('id')->first();
         if ($charge === null) {
-            return 'unpaid';
+            // Discounts as big as (or bigger than) the charges: the bill posts nothing (₱0) or a credit. Nothing is owed.
+            return $invoice->current_charges_cents <= 0 ? 'paid' : 'unpaid';
         }
         // A credit-only bill owes nothing.
         if ($charge->amount_cents <= 0) {

@@ -188,12 +188,12 @@ export default function Guide() {
                             title="Enter electricity"
                             text={
                                 <>
-                                    On <b>Bills</b>, click ⚡ on each boarder and type their electric bill (the November bill carries October's
-                                    electricity). Rooms with their own meter: enter the reading on <b>Electricity</b>.
+                                    On <b>Electricity</b>, type each room's total electric bill. It is split equally between the boarders in the room
+                                    (₱1,000 with 4 boarders = ₱250 each). Use "Needs reading" to see which rooms are still missing.
                                 </>
                             }
-                            href={bills}
-                            where="Bills"
+                            href={route('utilities.index')}
+                            where="Electricity"
                         />
                     </li>
 
@@ -204,8 +204,8 @@ export default function Guide() {
                         <Down />
                         <Decision
                             question={'"No electric bill yet" shows 0?'}
-                            no="Go back to step 4 and enter the missing electric bills. (If you bill anyway, their electricity moves to next month's bill.)"
-                            noHref={bills}
+                            no='Go back to step 4: on Electricity, choose "Needs reading" and enter each room still missing. (If you bill anyway, their share moves to next month’s bill.)'
+                            noHref={route('utilities.index')}
                         />
                     </li>
                     <li>

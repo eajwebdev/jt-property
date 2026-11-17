@@ -148,8 +148,8 @@ function MonthlyRoutine({ metrics }: { metrics: Metrics }) {
     const steps: { title: string; text: string; href: string; icon: typeof Zap; status?: ReactNode }[] = [
         {
             title: 'Enter electricity',
-            text: "Type each boarder's electric bill (the ⚡ button on the bills list), or a room's meter reading.",
-            href: billing,
+            text: "On Electricity, type each room's electric bill. It is split equally between the room's boarders.",
+            href: route('utilities.index'),
             icon: Zap,
             status: metrics.pending_utilities > 0 ? <Badge variant="warning">{metrics.pending_utilities} readings not billed yet</Badge> : null,
         },
