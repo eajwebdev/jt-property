@@ -7,7 +7,7 @@
     <meta charset="utf-8">
     <title>Statement of Accounts</title>
     <style>
-        @page { size: 13in 8.5in; }
+        @page { size: 14in 8.5in; }
         * { box-sizing: border-box; }
         body { margin: 0; color: #000; font: 9pt/1.25 Arial, 'Helvetica Neue', sans-serif; -webkit-print-color-adjust: exact; }
         .report + .report { break-before: page; }
@@ -16,7 +16,7 @@
         .head .line { font-size: 9pt; }
         .head .title { margin-top: 10px; font-size: 11pt; font-weight: bold; text-decoration: underline; }
         .head .asof { font-size: 9.5pt; margin-top: 2px; }
-        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        table { width: 100%; border-collapse: collapse; table-layout: auto; }
         th, td { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; }
         th { font-weight: normal; text-align: center; font-size: 8.5pt; line-height: 1.15; }
         th.group { letter-spacing: 6px; font-size: 9.5pt; }
@@ -29,6 +29,8 @@
         tr.totals td { font-weight: bold; background: #f1f1f1; border-top: 2px solid #000; }
         td.remarks { font-size: 8.5pt; }
         .empty { padding: 12px; text-align: center; }
+        .signature { margin-top: 16px; break-inside: avoid; font-size: 10pt; }
+        .signature .name { margin-top: 12px; font-weight: bold; font-size: 11pt; }
     </style>
 </head>
 <body>
@@ -41,8 +43,8 @@
             @if ($p->dti_registration_no || $p->business_permit_no)
                 <div class="line">
                     @if ($p->dti_registration_no) DTI Registration Certificate No. {{ $p->dti_registration_no }}@endif
-                    @if ($p->dti_registration_no && $p->business_permit_no); @endif
-                    @if ($p->business_permit_no) Business (Mayor's) Permit No. {{ $p->business_permit_no }}@endif
+                    @if ($p->dti_registration_no); @endif
+                    Business (Mayor's) Permit No. {{ $p->business_permit_no ?: '__________' }}
                 </div>
             @endif
             <div class="title">STATEMENT OF ACCOUNTS</div>
@@ -103,12 +105,19 @@
                         @foreach (\App\Services\Billing\StatementOfAccountsReport::COLUMNS as $column)
                             <td class="num">{{ $amount($report['totals'][$column]) }}</td>
                         @endforeach
-                        <td class="num">₱{{ number_format($report['totals']['total'] / 100, 2) }}</td>
+                        <td class="num">{{ number_format($report['totals']['total'] / 100, 2) }}</td>
                         <td></td>
                     </tr>
                 @endif
             </tbody>
         </table>
+        @if ($preparedBy)
+            <div class="signature">
+                <div>Prepared by:</div>
+                <div class="name">{{ $preparedBy }}</div>
+                <div>{{ $preparedByTitle }}</div>
+            </div>
+        @endif
     </div>
 @endforeach
 </body>

@@ -68,6 +68,17 @@ class MubarakSeederTest extends TestCase
         $this->assertSame(833355, $report['totals']['electric']);
         $this->assertSame(10743281, $report['totals']['total']);
 
+        config(['laravel-pdf.driver' => 'browsershot', 'laravel-pdf.browsershot.node_binary' => '/usr/bin/no-such-node']);
+        $this->actingAs($owner)
+            ->get(route('reports.statement-of-accounts', ['property_id' => $property->id, 'as_of' => '2026-10-05']))
+            ->assertOk()
+            ->assertSee('Actual Electric Consumption')
+            ->assertSee('8,333.55')
+            ->assertSee('107,432.81')
+            ->assertSee('Prepared by:')
+            ->assertSee('Jun Trio')
+            ->assertSee('size: 355.6mm 215.9mm');
+
         // The paper's remarks belong to October 2026; later sheets write their own.
         $later = app(StatementOfAccountsReport::class)->build($property, Carbon::parse('2026-11-05'))['sections']['Current Boarders'];
         $this->assertNotSame('x', $later->firstWhere('name', 'VILLACAMPA, Joven Rey Cabunson')['remarks']);
@@ -82,13 +93,23 @@ class MubarakSeederTest extends TestCase
         $this->assertSame([10000, 10000, 10000], $shares->except('RALO, Lhougan Daquiaog')->values()->all());
         UtilityBill::query()->delete();
 
-        // October = the first system bills: rent + the September electricity as one-time charges.
+        // October = the first system bills: rent + every amount in the sheet's electricity column.
         $this->assertSame(61, Invoice::whereDate('period_start', '2026-10-01')->count());
+        $this->assertSame(58, OneTimeCharge::count());
+        $this->assertSame(833355, (int) OneTimeCharge::sum('amount_cents'));
         $this->assertSame(OneTimeCharge::count(), OneTimeCharge::whereNotNull('invoice_id')->count());
         $acabal = Invoice::whereHas('billingAccount.payer', fn ($q) => $q->where('full_name', 'ACABAL, Praise Rodriguez'))->sole();
-        $this->assertSame(['Monthly Rental', 'Electricity – September 2026'], $acabal->lineItems->pluck('label')->all());
+        $this->assertSame(['Monthly Rental', 'Electricity – October 2026'], $acabal->lineItems->pluck('label')->all());
         $this->assertSame(77223, $acabal->current_charges_cents);
         $this->assertSame(['2026-09-30'], OpeningBalance::pluck('as_of')->map->toDateString()->unique()->values()->all());
+        $this->assertSame(0, OpeningBalance::all()->sum(fn (OpeningBalance $balance) => collect($balance->breakdown)->where('category', 'electric')->sum('amount_cents')));
+
+        $billing = $this->actingAs($owner)->get(route('billing.index', ['year' => 2026, 'month' => 10, 'property_id' => $property->id]))->assertOk();
+        $billing->assertInertia(fn ($page) => $page
+            ->component('billing/index')
+            ->where('rows.0.electricity', 'on_bill')
+            ->where('rows.0.electricity_cents', 7223)
+        );
 
         // Deposits only for boarders the sheet does not mark "(no deposit)".
         $this->assertFalse(SecurityDeposit::whereHas('billingAccount.payer', fn ($q) => $q->where('full_name', 'ALYAWAN, Joy Panlaan'))->exists());

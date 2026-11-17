@@ -198,6 +198,12 @@ function Figure({ label, value, tone }: { label: string; value: string; tone?: s
     );
 }
 
+function electricityInCharges(row: Row): number {
+    return row.lines
+        .filter((line) => line.amount_cents > 0 && line.label.toLowerCase().startsWith('electricity'))
+        .reduce((total, line) => total + line.amount_cents, 0);
+}
+
 export default function BillingIndex({ year, month, filters, properties, rows, canGenerate, closedBy, canDeleteMonth, canEmail, operations }: Props) {
     const [deleting, setDeleting] = useState(false);
     const { flash } = usePage<SharedData>().props;
@@ -220,7 +226,7 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
         skipped: rows.filter((r) => r.status === 'skipped').length,
     };
     const needsReviewSelected = counts.needs_review;
-    const noElectric = rows.filter((r) => r.electricity === 'missing').length;
+    const roomElectricityPending = rows.filter((r) => r.electricity === 'missing').length;
     const readyPending = ready.filter((r) => r.electricity === 'missing').length;
     // Bills already made this month, and the ones "Send all" would email now (not yet sent, tenant reachable by email).
     const billed = rows.filter((r) => r.status === 'already_billed' && r.invoice_id !== null);
@@ -430,9 +436,16 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                     <Figure label="New charges" value={formatCents(readyTotal)} />
                     <Figure label="Owed from before" value={formatCents(previousTotal)} />
                     <Figure label="Payments / credits" value={formatCents(paymentsTotal)} />
-                    <Figure label="No electric bill yet" value={String(noElectric)} tone={noElectric > 0 ? 'text-warning' : 'text-success'} />
+                    <Figure label="Boarders awaiting room electricity" value={String(roomElectricityPending)} tone={roomElectricityPending > 0 ? 'text-warning' : 'text-success'} />
                     <Figure label="Estimated total due" value={formatCents(readyTotal + previousTotal + paymentsTotal)} />
                 </dl>
+
+                {roomElectricityPending > 0 && (
+                    <p className="text-muted-foreground text-xs">
+                        Pending room electricity refers to {months[month - 1]} only. Earlier electricity already in new charges or a previous
+                        balance is included in the Statement of Accounts.
+                    </p>
+                )}
 
                 {rows.length === 0 ? (
                     <p className="text-muted-foreground rounded-xl border border-dashed p-6 text-center text-sm">Nobody has a bill in this month.</p>
@@ -472,9 +485,9 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                                     className="h-9 pl-8"
                                 />
                             </div>
-                            {noElectric > 0 && (
+                            {roomElectricityPending > 0 && (
                                 <span className="text-warning flex w-full items-center gap-1 text-xs font-medium sm:w-auto">
-                                    <Zap className="size-3.5" aria-hidden /> {noElectric} without electric bill
+                                    <Zap className="size-3.5" aria-hidden /> {roomElectricityPending} awaiting {months[month - 1]} room electricity
                                 </span>
                             )}
                         </div>
@@ -547,12 +560,17 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                                                                 {r.status === 'needs_review' && <AlertTriangle className="size-3" aria-hidden />}
                                                                 {statusLabel[r.status]}
                                                             </Badge>
+                                                            {electricityInCharges(r) > 0 && (
+                                                                <Badge variant="info" title="Electricity already included in this bill's new charges.">
+                                                                    <Zap className="size-3" aria-hidden /> {formatCents(electricityInCharges(r))} electricity in charges
+                                                                </Badge>
+                                                            )}
                                                             {r.electricity === 'missing' && (
                                                                 <Badge
                                                                     variant="warning"
-                                                                    title="This room's electric bill is not entered yet. Click ⚡ to enter it on the Electricity screen."
+                                                                    title="This month's room electricity has not been entered. Earlier electricity can already be included in this bill and in the Statement of Accounts."
                                                                 >
-                                                                    <Zap className="size-3" aria-hidden /> No electric bill yet
+                                                                    <Zap className="size-3" aria-hidden /> {months[month - 1]} room electricity pending
                                                                 </Badge>
                                                             )}
                                                             {r.electricity === 'next_bill' && (
@@ -769,9 +787,9 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                     {readyPending > 0 && (
                         <p className="bg-warning/10 text-warning flex gap-2 rounded-lg p-3 text-sm">
                             <Zap className="mt-0.5 size-4 shrink-0" aria-hidden />
-                            {readyPending} {readyPending === 1 ? 'bill has' : 'bills have'} no electricity yet: the room's electric bill is not
-                            entered on the Electricity screen. They will show "not yet entered"; the share is added to the next bill once you enter
-                            it.
+                            {readyPending} {readyPending === 1 ? 'boarder is' : 'boarders are'} awaiting {months[month - 1]} room electricity.
+                            Earlier electricity already in new charges or a previous balance remains on the Statement of Accounts.
+                            Enter the room bill on the Electricity screen to add this month's share to the next bill.
                         </p>
                     )}
                     <DialogFooter>
@@ -826,8 +844,9 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                     {sendPending > 0 && (
                         <p className="bg-warning/10 text-warning flex gap-2 rounded-lg p-3 text-sm">
                             <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-                            {sendPending} of these {sendPending === 1 ? 'statement still shows' : 'statements still show'} electricity "not yet
-                            entered". If you send now, the electricity will only appear on the next bill.
+                            {sendPending} of these {sendPending === 1 ? 'statement still shows' : 'statements still show'} this month's room
+                            electricity as "not yet entered". Earlier electricity charges remain on the bill; this month's share will appear on
+                            the next bill after you enter the room bill.
                         </p>
                     )}
                     <DialogFooter>

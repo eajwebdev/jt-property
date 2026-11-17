@@ -26,6 +26,7 @@ class DemoSeederTest extends TestCase
         $this->seed(DatabaseSeeder::class);
 
         $this->assertSame(2, Property::count());
+        $this->assertSame('Camingawan, Kabankalan, City', Property::where('code', 'HIL')->value('address'));
 
         $a101 = Unit::where('code', 'A101')->firstOrFail();
         $this->assertSame(4, $a101->beds()->count());

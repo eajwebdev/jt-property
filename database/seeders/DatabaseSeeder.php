@@ -10,16 +10,17 @@ use RuntimeException;
 
 /**
  * "php artisan migrate:fresh --seed --force" (or "db:seed --force") loads everything in one go:
- *  1. the owner login (owner@jt, password = SEED_PASSWORD; a staff demo login too on a developer's computer),
- *  2. the real Mubarak Boarding House data from the October 2026 Statement of Accounts,
- *  3. the demo properties (Riverside / Hillside Demo).
- * Every seeder is safe to run twice. Automated tests keep only the small demo data they were written against.
+ *  1. the owner login (owner@jt, password = SEED_PASSWORD),
+ *  2. removal of the original sample properties when they are still present,
+ *  3. the real Mubarak Boarding House data from the October 2026 Statement of Accounts.
+ * Automated tests retain their separate demo fixtures.
  */
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
         $local = app()->environment('local', 'testing');
+        $testing = app()->environment('testing');
         $password = config('app.seed_password');
 
         if (empty($password)) {
@@ -30,8 +31,8 @@ class DatabaseSeeder extends Seeder
             $password = 'password';
         }
 
-        $users = [[$local ? 'Owner Demo' : 'Owner', 'owner@jt', Role::Owner]];
-        if ($local) {
+        $users = [['Jun Trio', 'owner@jt', Role::Owner]];
+        if ($testing) {
             $users[] = ['Staff Demo', 'staff@jt', Role::Staff];
         }
 
@@ -43,19 +44,23 @@ class DatabaseSeeder extends Seeder
                 'email_verified_at' => now(),
             ]);
 
+            if ($email === 'owner@jt' && $user->name !== 'Jun Trio') {
+                $user->forceFill(['name' => 'Jun Trio'])->save();
+            }
+
             if ($local && ! Hash::check($password, $user->password)) {
                 $user->forceFill(['password' => $password])->save();
             }
         }
 
-        if (app()->environment('testing')) {
+        if ($testing) {
             $this->call(DemoSeeder::class);
 
             return;
         }
 
-        // Real data first, so its account numbers start at JT-000001 as on the printed statements.
+        $this->call(RemoveDemoDataSeeder::class);
+
         $this->call(MubarakBoardingHouseSeeder::class);
-        $this->call(DemoSeeder::class);
     }
 }

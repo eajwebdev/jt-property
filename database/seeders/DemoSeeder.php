@@ -27,6 +27,10 @@ class DemoSeeder extends Seeder
 {
     public function run(TenancyService $tenancy): void
     {
+        Property::where('code', 'HIL')
+            ->where('address', '45 Sample Road, Demo Heights, Demo City, Philippines (fake address)')
+            ->update(['address' => 'Camingawan, Kabankalan, City']);
+
         if (Property::where('code', 'RIV')->exists()) {
             return;
         }
@@ -58,7 +62,7 @@ class DemoSeeder extends Seeder
             'name' => 'Hillside Demo Apartments',
             'code' => 'HIL',
             'type' => PropertyType::Apartment,
-            'address' => '45 Sample Road, Demo Heights, Demo City, Philippines (fake address)',
+            'address' => 'Camingawan, Kabankalan, City',
             'description' => 'Demo data: apartment units rented as a whole.',
             'amenities' => 'Water, Parking, Own toilet and bath',
         ]);

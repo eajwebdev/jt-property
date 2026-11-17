@@ -12,7 +12,7 @@ use Tests\TestCase;
 
 /**
  * On the server, "php artisan migrate:fresh --seed --force" alone loads everything: the owner login, the real
- * Mubarak Boarding House data (October 2026), and the demo properties.
+ * Mubarak Boarding House data (October 2026), without sample properties.
  */
 class ProductionSeedingTest extends TestCase
 {
@@ -30,20 +30,29 @@ class ProductionSeedingTest extends TestCase
         config(['app.seed_password' => $password]);
     }
 
-    public function test_one_seed_command_loads_the_owner_the_real_data_and_the_demo_data(): void
+    public function test_one_seed_command_loads_the_owner_and_the_real_data_only(): void
     {
         $this->asProduction('Server-Secret-123');
 
         $this->seedLikeTheServer();
 
         $owner = User::where('email', 'owner@jt')->sole();
-        $this->assertSame('Owner', $owner->name);
+        $this->assertSame('Jun Trio', $owner->name);
         $this->assertTrue(password_verify('Server-Secret-123', $owner->password));
         $this->assertSame(0, User::where('role', 'staff')->count(), 'no demo staff login on a real server');
 
-        $this->assertEqualsCanonicalizing(['MBH', 'RIV', 'HIL'], Property::pluck('code')->all());
+        $this->assertSame(['MBH'], Property::pluck('code')->all());
         // The real data is loaded first, so its accounts get the first numbers (JT-000001 on a fresh server).
         $this->assertSame('MBH', BillingAccount::orderBy('id')->firstOrFail()->property->code);
+
+        config(['laravel-pdf.driver' => 'browsershot', 'laravel-pdf.browsershot.node_binary' => '/usr/bin/no-such-node']);
+        $this->actingAs($owner)
+            ->get(route('reports.statement-of-accounts', ['as_of' => '2026-10-05']))
+            ->assertOk()
+            ->assertSee('ACABAL, Praise Rodriguez')
+            ->assertSee('8,333.55')
+            ->assertSee('107,432.81')
+            ->assertDontSee('Demo Apartments');
     }
 
     public function test_seeding_again_adds_nothing_twice(): void

@@ -118,8 +118,8 @@ class BillingController extends Controller
     }
 
     /**
-     * Where this boarder's electricity stands for the month. It comes only from the room's bill on the Electricity
-     * screen (split between the room's boarders), so it is read fresh from there:
+     * Where this boarder's electricity stands for the month. For an issued invoice, its stored electric charge
+     * is authoritative. A bill with a pending electricity marker is checked against the room's latest utility bill:
      * missing (room bill not entered yet), on_bill (this boarder's share is on the bill), next_bill (entered after
      * this bill was made: it goes on the next bill, "entered late"), included (nothing to enter for this room,
      * e.g. included in rent). Water is free and never counted.
@@ -128,6 +128,14 @@ class BillingController extends Controller
      */
     private function electricityOf(PreviewRow $r, int $year, int $month): array
     {
+        $billedLines = collect($r->lines);
+        if ($r->status === 'already_billed' && ! $billedLines->contains(fn ($line) => $line['category'] === 'utility_pending' && str_starts_with($line['label'], 'Electricity'))) {
+            $billedCents = (int) $billedLines->filter(fn ($line) => str_contains(mb_strtolower($line['label']), 'electric'))
+                ->sum('amount_cents');
+
+            return ['electricity' => $billedCents > 0 ? 'on_bill' : 'included', 'electricity_cents' => $billedCents];
+        }
+
         $agreement = RentalAgreement::find($r->agreementId);
         $cycle = $agreement ? app(BillingCycleResolver::class)->cycleFor($agreement, $year, $month) : null;
         if ($cycle === null) {

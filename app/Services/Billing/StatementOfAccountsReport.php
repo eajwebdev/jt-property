@@ -165,8 +165,7 @@ class StatementOfAccountsReport
                 }
                 $column = $this->column($line);
                 $columns[$column] += $unpaid;
-                // Electricity is billed a month in arrears: the October bill carries September's consumption ("September 2026 EB").
-                $period = $column === 'electric' ? $invoice->period_start->copy()->subMonthNoOverflow()->format('Y-m') : $month;
+                $period = $month;
                 if (isset($months[$column])) {
                     $months[$column][$period] = ($months[$column][$period] ?? false) || $unpaid < $line->amount_cents;
                 } else {

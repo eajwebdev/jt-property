@@ -67,7 +67,7 @@ class StatementOfAccountsReportTest extends TestCase
         $this->assertSame(['rent' => 70000, 'electric' => 7223, 'advance' => 47223, 'deposit' => 0, 'key' => 0, 'others' => 0], $current['columns']);
         $this->assertSame(124446, $current['total_cents']);
         $this->assertSame(124446, app(ReceivableLedgerService::class)->balance($account));
-        $this->assertSame('November 2026 BH & October 2026 EB accounts + One month advance (no deposit)', $current['remarks']);
+        $this->assertSame('November 2026 BH & November 2026 EB accounts + One month advance (no deposit)', $current['remarks']);
 
         // The moved-out boarder's 500.00 is not listed (current boarders only), but stays owed on their account.
         $this->assertSame(['Current Boarders'], array_keys($report['sections']));

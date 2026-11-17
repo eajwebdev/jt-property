@@ -17,6 +17,7 @@ use App\Services\Billing\AgingReportService;
 use App\Services\Billing\PaymentService;
 use App\Services\Billing\StatementOfAccountsReport;
 use App\Support\PdfDocument;
+use App\Support\Settings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\View;
@@ -42,7 +43,7 @@ class ReportsController extends Controller
             ->withBrowsershot(fn ($browser) => $browser->showBackground())->generatePdfContent(), 'A4 landscape', '12mm');
     }
 
-    /** All boarders on one sheet, printed on long bond paper (8.5" × 13") in landscape. One property per page set. */
+    /** All boarders on one sheet, printed on legal paper (8.5" × 14") in landscape. One property per page set. */
     public function statementOfAccounts(Request $request, StatementOfAccountsReport $report): SymfonyResponse
     {
         // as_of: the date the sheet is "as of" (e.g. 2026-10-05). Left empty, each property uses its latest bill's due date.
@@ -59,13 +60,17 @@ class ReportsController extends Controller
 
         $asOf = isset($data['as_of']) ? Carbon::parse($data['as_of'])->startOfDay() : null;
         $reports = $properties->map(fn (Property $property) => $report->build($property, $asOf));
-        $html = View::make('pdf.statement-of-accounts', ['reports' => $reports])->render();
+        $html = View::make('pdf.statement-of-accounts', [
+            'reports' => $reports,
+            'preparedBy' => Settings::get('soa_prepared_by'),
+            'preparedByTitle' => Settings::get('soa_prepared_by_title'),
+        ])->render();
         $footer = '<div style="width:100%; font:7.5pt Arial,sans-serif; text-align:center;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>';
         $name = 'statement-of-accounts-'.($properties->count() === 1 ? $properties->first()->code.'-' : '').$reports->first()['as_of']->format('Y-m-d').'.pdf';
 
-        // Long bond paper (8.5" x 13"), landscape.
-        return PdfDocument::respond($html, $name, fn () => PdfDocument::builder($html, $footer)->paperSize(330.2, 215.9, 'mm')->margins(10, 10, 12, 10)
-            ->withBrowsershot(fn ($browser) => $browser->showBackground())->generatePdfContent(), '330.2mm 215.9mm', '10mm 10mm 12mm 10mm');
+        // Match the workbook's legal-size landscape print setup.
+        return PdfDocument::respond($html, $name, fn () => PdfDocument::builder($html, config('laravel-pdf.driver') === 'dompdf' ? null : $footer)->paperSize(355.6, 215.9, 'mm')->margins(10, 10, 12, 10)
+            ->withBrowsershot(fn ($browser) => $browser->showBackground())->generatePdfContent(), '355.6mm 215.9mm', '10mm 10mm 12mm 10mm');
     }
 
     /** @return array<string, mixed> */

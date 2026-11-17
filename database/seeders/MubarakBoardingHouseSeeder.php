@@ -32,11 +32,10 @@ use RuntimeException;
  * "Current Boarders" rows, in the same order, with the same room, rate, amounts and remark, so the app's printed
  * Statement of Accounts as of 5 October 2026 is the same sheet. The system starts in October 2026:
  *
- *  - Before October ("previous unpaid", entered once, never billed): every BH month before October and EB that
- *    spans several months -> one approved opening balance per account,
- *    dated 30 Sep 2026, with BH / EB lines per month (the same thing an owner enters in Opening Balances).
- *  - October = the first bills the system makes: October BH (monthly rate) + the September EB shown on the paper,
- *    as a one-time "Electricity - September 2026" charge. Boarders the paper does not list for October BH already
+ *  - Before October ("previous unpaid", entered once, never billed): every BH month before October -> one
+ *    approved opening balance per account, dated 30 Sep 2026, with BH lines per month.
+ *  - October = the first bills the system makes: October BH (monthly rate) + the sheet's Actual Electric
+ *    Consumption column as one-time "Electricity - October 2026" charges. Boarders without October BH unpaid already
  *    paid it: a payment ("paid before the system started") settles their October bill.
  *  - From November the system bills as usual; anything still unpaid is the "previous balance" on the next bill.
  *  - Free stay (student assistant, rate 0): a ₱0 rental in the room, so the boarder is listed; pays no electricity.
@@ -70,6 +69,12 @@ class MubarakBoardingHouseSeeder extends Seeder
     public function run(TenancyService $tenancy, OpeningBalanceService $openings, InvoiceGenerationService $billing, PaymentService $payments): void
     {
         if (Property::where('code', self::CODE)->exists()) {
+            if (Settings::get('soa_prepared_by') === 'CHRISTIAN G. TAGUINES') {
+                $owner = User::where('role', Role::Owner)->orderBy('id')->first()
+                    ?? throw new RuntimeException('Create the owner user before seeding Mubarak Boarding House.');
+                Settings::set('soa_prepared_by', 'Jun Trio', $owner);
+            }
+
             return; // safe to run twice
         }
         $owner = User::where('role', Role::Owner)->orderBy('id')->first()
@@ -89,11 +94,9 @@ class MubarakBoardingHouseSeeder extends Seeder
         $start = Carbon::parse(self::RENTAL_START);
         $asOf = Carbon::parse(self::AS_OF);
         $first = Carbon::parse(self::FIRST_MONTH.'-01');
-        $eb = $first->copy()->subMonth()->format('Y-m'); // the October bill carries September's electricity
-
         Settings::set('company_name', 'Mubarak Boarding House', $owner);
         Settings::set('company_address', 'Purok CPSU Uno, Barangay Camingawan, Kabankalan City', $owner);
-        Settings::set('soa_prepared_by', 'CHRISTIAN G. TAGUINES', $owner);
+        Settings::set('soa_prepared_by', 'Jun Trio', $owner);
         Settings::set('soa_prepared_by_title', 'Owner', $owner);
 
         $property = Property::create([
@@ -112,7 +115,7 @@ class MubarakBoardingHouseSeeder extends Seeder
         $nextBed = [];
         $accounts = []; // name => [agreement, row, opening lines, October BH still owed]
 
-        // 1. Rooms, boarders, rentals, deposits, and the September EB to put on the October bill.
+        // 1. Rooms, boarders, rentals, deposits, and October electricity charges.
         foreach ($current as $row) {
             $unit = $units[$row['building'].'|'.$row['room']];
             $tenant = $this->tenant($property, $row);
@@ -136,23 +139,23 @@ class MubarakBoardingHouseSeeder extends Seeder
             $opening = [];
             $octoberRent = 0;
             foreach ($row['breakdown'] as $line) {
-                $single = ($line['from'] ?? $line['month']) === $line['month'];
                 if ($line['category'] === 'rent' && $line['month'] === self::FIRST_MONTH) {
                     $octoberRent += $line['amount_cents']; // billed by the system as the October rent
-                } elseif ($line['category'] === 'electric' && $single && $line['month'] === $eb && ! $line['partial']) {
-                    OneTimeCharge::create([
-                        'billing_account_id' => $agreement->billing_account_id, 'rental_agreement_id' => $agreement->id,
-                        'charge_category_id' => $electricity, 'label' => 'Electricity – '.Carbon::parse($eb.'-01')->format('F Y'),
-                        'kind' => 'charge', 'amount_cents' => $line['amount_cents'], 'bill_month' => $first->toDateString(), 'created_by' => $owner->id,
-                    ]);
-                } else {
-                    $opening[] = $line; // before October, or an EB amount that spans several months
+                } elseif ($line['category'] === 'rent') {
+                    $opening[] = $line;
                 }
+            }
+            if ($row['electric_cents'] > 0) {
+                OneTimeCharge::create([
+                    'billing_account_id' => $agreement->billing_account_id, 'rental_agreement_id' => $agreement->id,
+                    'charge_category_id' => $electricity, 'label' => 'Electricity – October 2026',
+                    'kind' => 'charge', 'amount_cents' => $row['electric_cents'], 'bill_month' => $first->toDateString(), 'created_by' => $owner->id,
+                ]);
             }
             $accounts[$row['name']] = [$agreement, $row, $opening, $octoberRent];
         }
 
-        // 2. October 2026: the first bills made by the system (rent + the September electricity above).
+        // 2. October 2026: the first bills made by the system (rent + the sheet's electricity column).
         $billing->generate($first->year, $first->month, $owner, $property->id);
 
         // 3. October BH the paper does not list as unpaid was paid before the system started. Recorded before the
