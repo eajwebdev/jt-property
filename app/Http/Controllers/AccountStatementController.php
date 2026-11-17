@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\BillingAccount;
+use App\Models\LedgerEntry;
+use App\Models\Payment;
 use App\Services\Billing\StatementComposer;
+use App\Support\Money;
 use App\Support\PdfDocument;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -19,13 +22,35 @@ class AccountStatementController extends Controller
     {
         abort_unless($request->user()->canAccessProperty($account->property_id), 403);
         [$from, $to] = $this->dates($request);
-        $account->load(['payer:id,full_name', 'property:id,name']);
+        $account->load(['payer:id,full_name,email', 'property:id,name']);
         $statement = $composer->forPeriod($account, Carbon::parse($from), Carbon::parse($to));
 
+        // Every payment on this account (all dates), newest first, each with its receipt.
+        $payments = Payment::where('billing_account_id', $account->id)->orderByDesc('paid_on')->orderByDesc('id')
+            ->get(['id', 'amount_cents', 'paid_on', 'method', 'reference', 'status', 'ack_number', 'receipt_emailed_to'])
+            ->map(fn (Payment $p) => [
+                'id' => $p->id,
+                'receipt_number' => $p->ack_number,
+                'paid_on' => $p->paid_on->toDateString(),
+                'amount_cents' => $p->amount_cents,
+                'amount' => Money::format($p->amount_cents),
+                'method' => $p->method,
+                'reference' => $p->reference,
+                'status' => $p->status,
+                'account_id' => $account->id,
+                'account_no' => $account->account_no,
+                'receipt_emailed_to' => $p->receipt_emailed_to,
+            ]);
+
         return Inertia::render('accounts/statement', [
-            'account' => ['id' => $account->id, 'number' => $account->account_no, 'tenant' => $account->payer->full_name, 'property' => $account->property->name],
+            'account' => [
+                'id' => $account->id, 'number' => $account->account_no, 'tenant' => $account->payer->full_name,
+                'tenant_id' => $account->payer_tenant_id, 'email' => $account->payer->email, 'property' => $account->property->name,
+            ],
             'from' => $from, 'to' => $to,
             'statement' => ['opening_cents' => $statement->openingCents, 'rows' => $statement->rows, 'closing_cents' => $statement->closingCents],
+            'payments' => $payments,
+            'balance_cents' => (int) LedgerEntry::where('billing_account_id', $account->id)->sum('amount_cents'),
         ]);
     }
 

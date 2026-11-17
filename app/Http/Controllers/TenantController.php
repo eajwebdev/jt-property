@@ -225,7 +225,7 @@ class TenantController extends Controller
         $accountNos = $tenant->billingAccounts()->pluck('account_no', 'id');
         $payments = Payment::whereIn('billing_account_id', $accountNos->keys())
             ->orderByDesc('paid_on')->orderByDesc('id')
-            ->get(['id', 'billing_account_id', 'amount_cents', 'paid_on', 'method', 'reference', 'status', 'ack_number'])
+            ->get(['id', 'billing_account_id', 'amount_cents', 'paid_on', 'method', 'reference', 'status', 'ack_number', 'receipt_emailed_to'])
             ->map(fn (Payment $p) => [
                 'id' => $p->id,
                 'receipt_number' => $p->ack_number,
@@ -237,6 +237,7 @@ class TenantController extends Controller
                 'status' => $p->status,
                 'account_id' => $p->billing_account_id,
                 'account_no' => $accountNos[$p->billing_account_id] ?? null,
+                'receipt_emailed_to' => $p->receipt_emailed_to,
             ]);
         $balances = $accountNos->keys()->mapWithKeys(fn ($id) => [$id => (int) LedgerEntry::where('billing_account_id', $id)->sum('amount_cents')]);
 

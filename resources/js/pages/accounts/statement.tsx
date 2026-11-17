@@ -1,5 +1,6 @@
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
+import { TenantPayments, type TenantPayment } from '@/components/tenant-payments';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,12 +9,14 @@ import { formatCents } from '@/lib/money';
 import { formatDate } from '@/lib/tenant-labels';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
-import { FileDown, Printer, Scale, ScrollText, Search } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import { FileDown, Printer, Scale, ScrollText, Search, UserRound } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 interface Props {
-    account: { id: number; number: string; tenant: string; property: string };
+    account: { id: number; number: string; tenant: string; tenant_id: number; email: string | null; property: string };
+    payments: TenantPayment[];
+    balance_cents: number;
     from: string;
     to: string;
     statement: {
@@ -32,7 +35,7 @@ interface Props {
     };
 }
 
-export default function AccountStatement({ account, from, to, statement }: Props) {
+export default function AccountStatement({ account, from, to, statement, payments, balance_cents }: Props) {
     const [start, setStart] = useState(from);
     const [end, setEnd] = useState(to);
     const breadcrumbs: BreadcrumbItem[] = [
@@ -50,18 +53,31 @@ export default function AccountStatement({ account, from, to, statement }: Props
             <div className="mx-auto w-full max-w-5xl space-y-6 p-4 md:p-6">
                 <PageHeader
                     icon={ScrollText}
-                    title="Account ledger"
-                    description={`${account.tenant} · ${account.number} · ${account.property}`}
+                    title={`${account.tenant} — ledger`}
+                    description={`${account.number} · ${account.property} · ${
+                        balance_cents > 0
+                            ? `${formatCents(balance_cents)} still owed`
+                            : balance_cents < 0
+                              ? `${formatCents(-balance_cents)} credit`
+                              : 'fully paid'
+                    } today`}
                     actions={
-                        <Button asChild variant="outline">
-                            <a
-                                href={route('accounts.statement.pdf', { account: account.id, from: start, to: end })}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >
-                                <FileDown /> View PDF
-                            </a>
-                        </Button>
+                        <>
+                            <Button asChild variant="outline">
+                                <Link href={route('tenants.show', account.tenant_id)}>
+                                    <UserRound /> Tenant page
+                                </Link>
+                            </Button>
+                            <Button asChild>
+                                <a
+                                    href={route('accounts.statement.pdf', { account: account.id, from: start, to: end })}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <FileDown /> Print ledger (PDF)
+                                </a>
+                            </Button>
+                        </>
                     }
                 />
 
@@ -146,6 +162,8 @@ export default function AccountStatement({ account, from, to, statement }: Props
                         </tfoot>
                     </table>
                 </div>
+
+                <TenantPayments payments={payments} email={account.email} title="All payments & receipts" />
             </div>
         </AppLayout>
     );

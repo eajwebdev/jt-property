@@ -1,3 +1,4 @@
+import { EmailReceiptButton } from '@/components/email-receipt-button';
 import { methodLabels } from '@/components/record-payment-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ export interface TenantPayment {
     status: 'approved' | 'pending' | 'reversed';
     account_id: number;
     account_no: string | null;
+    receipt_emailed_to?: string | null;
 }
 
 export interface AccountBalance {
@@ -33,7 +35,18 @@ const statusBadge: Record<TenantPayment['status'], { label: string; variant: 'su
 };
 
 /** The boarder's payments with a receipt for each one, plus where each account stands and a link to its full ledger. */
-export function TenantPayments({ payments, balances }: { payments: TenantPayment[]; balances: AccountBalance[] }) {
+export function TenantPayments({
+    payments,
+    balances = [],
+    email = null,
+    title = 'Payments & receipts',
+}: {
+    payments: TenantPayment[];
+    balances?: AccountBalance[];
+    /** The boarder's email, pre-filled when emailing a receipt. */
+    email?: string | null;
+    title?: string;
+}) {
     const totalPaid = payments.filter((p) => p.status === 'approved').reduce((sum, p) => sum + p.amount_cents, 0);
 
     return (
@@ -41,7 +54,7 @@ export function TenantPayments({ payments, balances }: { payments: TenantPayment
             <div className="flex flex-wrap items-end justify-between gap-2">
                 <div>
                     <h2 id="payments" className="text-lg font-semibold">
-                        Payments &amp; receipts
+                        {title}
                     </h2>
                     <p className="text-muted-foreground text-sm">
                         Every payment has its own receipt. {payments.length > 0 && `${formatCents(totalPaid)} paid in total.`}
@@ -123,16 +136,27 @@ export function TenantPayments({ payments, balances }: { payments: TenantPayment
                                     </td>
                                     <td className="px-3 py-2 text-right">
                                         {p.receipt_number ? (
-                                            <Button asChild size="sm" variant="outline">
-                                                <a
-                                                    href={route('payments.acknowledgment', p.id)}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    aria-label={`Print receipt ${p.receipt_number}`}
-                                                >
-                                                    <Printer /> Receipt
-                                                </a>
-                                            </Button>
+                                            <span className="inline-flex flex-wrap justify-end gap-1">
+                                                <Button asChild size="sm" variant="outline">
+                                                    <a
+                                                        href={route('payments.acknowledgment', p.id)}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        aria-label={`Print receipt ${p.receipt_number}`}
+                                                    >
+                                                        <Printer /> Receipt
+                                                    </a>
+                                                </Button>
+                                                {p.status === 'approved' && (
+                                                    <EmailReceiptButton
+                                                        paymentId={p.id}
+                                                        receiptNumber={p.receipt_number}
+                                                        defaultEmail={email}
+                                                        emailedTo={p.receipt_emailed_to}
+                                                        variant="ghost"
+                                                    />
+                                                )}
+                                            </span>
                                         ) : (
                                             <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
                                                 <ReceiptText className="size-3.5" aria-hidden /> After approval

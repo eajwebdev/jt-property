@@ -43,7 +43,7 @@ class CollectionsController extends Controller
         $debits = $this->payments->openDebits($ids)->groupBy('billing_account_id');
         $today = today();
 
-        $rows = $accounts->map(function (BillingAccount $a) use ($balances, $debits, $today) {
+        $allRows = $accounts->map(function (BillingAccount $a) use ($balances, $debits, $today) {
             $open = $debits->get($a->id, collect());
             $balance = (int) ($balances[$a->id] ?? 0);
             $oldest = $open->min('due_date');
@@ -68,14 +68,28 @@ class CollectionsController extends Controller
                     'credit' => $balance < 0,
                 ],
             ];
-        })
-            ->filter(fn ($r) => $r['balance_cents'] !== 0 || $r['flags']['unpaid'])
+        })->filter(fn ($r) => $r['balance_cents'] !== 0 || $r['flags']['unpaid']);
+
+        $rows = $allRows
             ->when($status, fn ($c) => $c->filter(fn ($r) => $r['flags'][$status]))
             ->sortByDesc('balance_cents')
             ->values();
 
         return Inertia::render('collections/index', [
             'rows' => $rows,
+            'paymentAccounts' => $accounts->map(fn (BillingAccount $account) => [
+                'account_id' => $account->id,
+                'account_no' => $account->account_no,
+                'tenant' => $account->payer->full_name,
+            ])->values(),
+            'summary' => [
+                'total_due_cents' => $allRows->sum(fn ($row) => max(0, $row['balance_cents'])),
+                'overdue_accounts' => $allRows->where('flags.overdue', true)->count(),
+                'credit_cents' => $allRows->sum(fn ($row) => max(0, -$row['balance_cents'])),
+                'accounts_with_balance' => $allRows->count(),
+            ],
+            'statusCounts' => collect(self::STATUSES)->mapWithKeys(fn (string $key) => [$key => $allRows->where("flags.{$key}", true)->count()])->all()
+                + ['all' => $allRows->count()],
             'properties' => Property::query()
                 ->when($user->role === Role::Staff, fn (Builder $q) => $q->whereIn('id', $user->properties()->select('properties.id')))
                 ->orderBy('name')->get(['id', 'name']),

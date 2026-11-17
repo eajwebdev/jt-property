@@ -1,4 +1,5 @@
 import { AllocateDialog, type DebitOption } from '@/components/account-money-dialogs';
+import { EmailReceiptButton } from '@/components/email-receipt-button';
 import InputError from '@/components/input-error';
 import { PageHeader } from '@/components/page-header';
 import { methodLabels } from '@/components/record-payment-dialog';
@@ -30,6 +31,9 @@ interface Props {
         notes: string | null;
         status: 'pending' | 'approved' | 'reversed';
         ack_number: string | null;
+        tenant_email: string | null;
+        receipt_emailed_at: string | null;
+        receipt_emailed_to: string | null;
         collected_by: string | null;
         approved_by: string | null;
         has_proof: boolean;
@@ -124,12 +128,27 @@ export default function PaymentShow({ payment, allocations, openDebits, canManag
                                 <Printer /> Print receipt {payment.ack_number}
                             </a>
                         </Button>
+                        {payment.status === 'approved' && (
+                            <EmailReceiptButton
+                                paymentId={payment.id}
+                                receiptNumber={payment.ack_number}
+                                defaultEmail={payment.tenant_email}
+                                emailedTo={payment.receipt_emailed_to}
+                                size="lg"
+                                label={payment.receipt_emailed_to ? 'Email receipt again' : 'Email receipt'}
+                            />
+                        )}
                         <Button asChild size="lg" variant="outline">
                             <Link href={route('accounts.statement', payment.account_id)}>
                                 <BookOpen /> {payment.tenant}&apos;s ledger
                             </Link>
                         </Button>
                     </div>
+                )}
+                {payment.receipt_emailed_to && payment.receipt_emailed_at && (
+                    <p className="text-muted-foreground -mt-3 text-sm">
+                        Receipt emailed to {payment.receipt_emailed_to} on {formatDate(payment.receipt_emailed_at.slice(0, 10))}.
+                    </p>
                 )}
 
                 {flash?.success && (

@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\PaymentReceiptMail;
 use App\Models\BillingAccount;
 use App\Models\Payment;
 use App\Rules\Pesos;
 use App\Services\Billing\PaymentAcknowledgmentService;
 use App\Services\Billing\PaymentService;
+use App\Support\Audit;
 use App\Support\Money;
 use App\Support\PdfDocument;
 use Illuminate\Http\JsonResponse;
@@ -14,7 +16,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -85,7 +89,7 @@ class PaymentController extends Controller
     {
         Gate::authorize('view', $payment);
 
-        $payment->load(['billingAccount.payer:id,full_name', 'property:id,name,code', 'collector:id,name', 'approver:id,name', 'allocations.ledgerEntry']);
+        $payment->load(['billingAccount.payer:id,full_name,email', 'property:id,name,code', 'collector:id,name', 'approver:id,name', 'allocations.ledgerEntry']);
         $user = request()->user();
 
         return Inertia::render('payments/show', [
@@ -104,6 +108,9 @@ class PaymentController extends Controller
                 'notes' => $payment->notes,
                 'status' => $payment->status,
                 'ack_number' => $payment->ack_number,
+                'tenant_email' => $payment->billingAccount->payer->email,
+                'receipt_emailed_at' => $payment->receipt_emailed_at?->toDateTimeString(),
+                'receipt_emailed_to' => $payment->receipt_emailed_to,
                 'collected_by' => $payment->collector?->name,
                 'approved_by' => $payment->approver?->name,
                 'has_proof' => $payment->proof_path !== null,
@@ -136,6 +143,31 @@ class PaymentController extends Controller
         abort_if($payment->proof_path === null || ! Storage::disk('local')->exists($payment->proof_path), 404);
 
         return Storage::disk('local')->download($payment->proof_path);
+    }
+
+    /**
+     * Emails the payment's receipt (PDF attached) to the boarder's email, or to an address typed in. Queued: it goes
+     * out with the queue worker. Only approved payments have a receipt; reversed ones are not sent.
+     */
+    public function emailReceipt(Request $request, Payment $payment): RedirectResponse
+    {
+        Gate::authorize('view', $payment);
+        $data = $request->validate(['email' => ['nullable', 'email:rfc', 'max:255']]);
+        if ($payment->status !== 'approved' || $payment->ack_number === null) {
+            throw ValidationException::withMessages(['payment' => $payment->status === 'reversed'
+                ? 'This payment was reversed, so its receipt is not sent.'
+                : 'The receipt is issued once the owner approves this payment.']);
+        }
+        $to = $data['email'] ?? $payment->billingAccount->payer->email;
+        if (! $to) {
+            throw ValidationException::withMessages(['email' => 'This boarder has no email address. Type one to send the receipt to.']);
+        }
+
+        Mail::to($to)->queue(new PaymentReceiptMail($payment));
+        $payment->forceFill(['receipt_emailed_at' => now(), 'receipt_emailed_to' => $to])->save();
+        Audit::log('payment.receipt_emailed', $payment, ['to' => $to, 'receipt' => $payment->ack_number]);
+
+        return back()->with('success', "Receipt {$payment->ack_number} is being emailed to {$to}.");
     }
 
     public function acknowledgment(Payment $payment, PaymentAcknowledgmentService $documents): \Symfony\Component\HttpFoundation\Response

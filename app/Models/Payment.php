@@ -13,12 +13,12 @@ class Payment extends Model
     protected $fillable = [
         'billing_account_id', 'property_id', 'amount_cents', 'paid_on', 'method', 'reference', 'payer_name',
         'collected_by', 'status', 'proof_path', 'notes', 'approved_by', 'ack_number', 'ledger_entry_id',
-        'reversed_at', 'reverse_reason',
+        'reversed_at', 'reverse_reason', 'receipt_emailed_at', 'receipt_emailed_to',
     ];
 
     protected function casts(): array
     {
-        return ['amount_cents' => 'integer', 'paid_on' => 'date', 'reversed_at' => 'datetime'];
+        return ['amount_cents' => 'integer', 'paid_on' => 'date', 'reversed_at' => 'datetime', 'receipt_emailed_at' => 'datetime'];
     }
 
     public function billingAccount(): BelongsTo

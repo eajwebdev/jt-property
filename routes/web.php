@@ -73,6 +73,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
     Route::get('payments/{payment}/proof', [PaymentController::class, 'proof'])->name('payments.proof');
     Route::get('payments/{payment}/acknowledgment.pdf', [PaymentController::class, 'acknowledgment'])->name('payments.acknowledgment');
+    Route::post('payments/{payment}/receipt-email', [PaymentController::class, 'emailReceipt'])->middleware('throttle:20,1')->name('payments.receipt.email');
     Route::post('payments/{payment}/approve', [PaymentController::class, 'approve'])->name('payments.approve');
     Route::post('payments/{payment}/reverse', [PaymentController::class, 'reverse'])->name('payments.reverse');
     Route::post('payments/{payment}/allocate', [PaymentController::class, 'allocate'])->name('payments.allocate');

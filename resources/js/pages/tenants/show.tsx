@@ -334,7 +334,7 @@ export default function Show({
                     )}
                 </section>
 
-                <TenantPayments payments={payments} balances={balances} />
+                <TenantPayments payments={payments} balances={balances} email={tenant.email} />
 
                 <section aria-labelledby="stays" className="space-y-3">
                     <h2 id="stays" className="text-lg font-semibold">

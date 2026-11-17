@@ -143,14 +143,20 @@ class PaymentHttpTest extends TestCase
 
     public function test_collections_lists_balances_with_aging_and_filters(): void
     {
+        BillingAccount::factory()->for($this->property)->create();
+
         $this->get(route('collections.index'))->assertInertia(fn (Assert $p) => $p
             ->component('collections/index')
             ->has('rows', 1)
+            ->has('paymentAccounts', 2)
             ->where('rows.0.balance_cents', 180000)
             ->where('rows.0.aging', '31-60')
+            ->where('summary.total_due_cents', 180000)
+            ->where('summary.overdue_accounts', 1)
+            ->where('statusCounts.all', 1)
         );
 
-        $this->get(route('collections.index', ['status' => 'credit']))->assertInertia(fn (Assert $p) => $p->has('rows', 0));
+        $this->get(route('collections.index', ['status' => 'credit']))->assertInertia(fn (Assert $p) => $p->has('rows', 0)->has('paymentAccounts', 2));
         $this->get(route('collections.index', ['status' => 'overdue']))->assertInertia(fn (Assert $p) => $p->has('rows', 1));
     }
 
