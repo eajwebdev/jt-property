@@ -4,11 +4,13 @@ namespace Tests\Feature;
 
 use App\Jobs\SendStatementEmailJob;
 use App\Mail\MonthlyStatementMail;
+use App\Models\ActivityLog;
 use App\Models\BillingAccount;
 use App\Models\BillingBatch;
 use App\Models\EmailDelivery;
 use App\Models\Invoice;
 use App\Models\Property;
+use App\Models\StatementSnapshot;
 use App\Models\User;
 use App\Services\Billing\BatchExportService;
 use App\Services\Billing\BillingEmailService;
@@ -147,6 +149,31 @@ class BillingBatchExportTest extends TestCase
         $staff = User::where('role', 'staff')->orderBy('id')->firstOrFail();
         $other = Property::whereNotIn('id', $staff->properties()->select('properties.id'))->orderBy('id')->firstOrFail();
         $this->actingAs($staff)->get(route('billing.month-statements', ['year' => 2026, 'month' => 11, 'property_id' => $other->id]))->assertNotFound();
+    }
+
+    public function test_print_all_statements_is_one_html_page_without_rendering_pdfs(): void
+    {
+        $owner = $this->owner();
+        $accounts = BillingAccount::orderBy('id')->limit(2)->pluck('id')->all();
+        $this->actingAs($owner)->post(route('billing.generate'), ['year' => 2026, 'month' => 11, 'account_ids' => $accounts])->assertRedirect();
+        $invoices = Invoice::orderBy('number')->get();
+
+        $response = $this->get(route('billing.month-statements.print', ['year' => 2026, 'month' => 11]));
+        $response->assertOk()->assertHeader('Content-Type', 'text/html; charset=UTF-8');
+        $html = $response->getContent();
+        foreach ($invoices as $invoice) {
+            $this->assertStringContainsString($invoice->number, $html);
+        }
+        $this->assertSame(2, substr_count($html, 'class="statement-document"'));
+        $this->assertStringContainsString('window.print()', $html);
+        // Fast path: no Chrome, no stored PDF. Each printed statement is still audited.
+        $this->assertSame(0, StatementSnapshot::count());
+        $this->assertSame(2, ActivityLog::where('action', 'statement.printed')->count());
+
+        $this->get(route('billing.month-statements.print', ['year' => 2026, 'month' => 10]))->assertNotFound();
+        $staff = User::where('role', 'staff')->orderBy('id')->firstOrFail();
+        $other = Property::whereNotIn('id', $staff->properties()->select('properties.id'))->orderBy('id')->firstOrFail();
+        $this->actingAs($staff)->get(route('billing.month-statements.print', ['year' => 2026, 'month' => 11, 'property_id' => $other->id]))->assertNotFound();
     }
 
     public function test_replayed_batch_can_export_previously_created_invoices(): void

@@ -81,6 +81,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('invoices/{invoice}/statement.pdf', [InvoiceStatementController::class, 'download'])->name('invoices.statement.pdf');
     Route::get('invoices/{invoice}/statement-copy.pdf', [InvoiceStatementController::class, 'copy'])->name('invoices.statement.copy');
     Route::get('billing', [BillingController::class, 'index'])->name('billing.index');
+    Route::get('billing/statements/print', [BillingController::class, 'printStatements'])->name('billing.month-statements.print');
     Route::get('billing/statements.pdf', [BillingController::class, 'monthStatements'])->name('billing.month-statements');
     Route::post('billing/generate', [BillingController::class, 'generate'])->name('billing.generate');
     Route::get('billing/batches/{batch}', [BillingController::class, 'showBatch'])->name('billing.batches.show');

@@ -6,7 +6,7 @@
     $peso = fn (int $c) => Money::format($c);
     $b64 = fn (string $path) => base64_encode((string) @file_get_contents($path));
     $font = fn (int $w) => 'data:font/woff2;base64,'.$b64(resource_path("fonts/instrument-sans-latin-{$w}.woff2"));
-    $logo = 'data:image/png;base64,'.$b64(resource_path('img/mubarak-logo-horizontal-pdf.png'));
+    $logo = 'data:image/webp;base64,'.$b64(resource_path('img/mubarak-logo-horizontal-pdf.webp'));
     $period = $d($s->periodStart).' – '.$d($s->periodEnd);
     $usage = function (array $l) use ($period) {
         if ($l['qty_e3'] !== null && $l['unit_rate_e4'] !== null) {

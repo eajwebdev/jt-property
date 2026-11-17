@@ -439,8 +439,35 @@ class BillingController extends Controller
         ]);
     }
 
-    /** Every finalized statement of a month (one property or all the user may see) in one printable PDF. */
+    /** Every finalized statement of a month in one PDF made on the server (needs Chrome; slow the first time). */
     public function monthStatements(Request $request, BatchExportService $exports): StreamedResponse
+    {
+        [$invoices, $year, $month] = $this->monthStatementInvoices($request);
+        $bytes = $exports->combined($invoices);
+
+        $filename = sprintf('statements-%04d-%02d.pdf', $year, $month);
+
+        return response()->stream(fn () => print ($bytes), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+        ]);
+    }
+
+    /** The same statements as one print-ready page: instant on any hosting, the browser prints or saves the PDF. */
+    public function printStatements(Request $request, BatchExportService $exports): \Illuminate\Http\Response
+    {
+        [$invoices, $year, $month] = $this->monthStatementInvoices($request);
+        $title = Carbon::create($year, $month, 1)->format('F Y').' statements';
+
+        return response($exports->printable($invoices, $title))->header('Content-Type', 'text/html; charset=UTF-8');
+    }
+
+    /**
+     * Finalized bills of the requested month the user may see (one property or all), by bill number. 404 when none.
+     *
+     * @return array{0: Collection<int, Invoice>, 1: int, 2: int}
+     */
+    private function monthStatementInvoices(Request $request): array
     {
         $data = $request->validate([
             'year' => ['required', 'integer', 'between:2000,2100'],
@@ -452,14 +479,8 @@ class BillingController extends Controller
         $invoices = $this->monthInvoices((int) $data['year'], (int) $data['month'], null)
             ->whereIn('property_id', $scope)->orderBy('number')->get();
         abort_if($invoices->isEmpty(), 404);
-        $bytes = $exports->combined($invoices);
 
-        $filename = sprintf('statements-%04d-%02d.pdf', $data['year'], $data['month']);
-
-        return response()->stream(fn () => print ($bytes), 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="'.$filename.'"',
-        ]);
+        return [$invoices, (int) $data['year'], (int) $data['month']];
     }
 
     public function retry(BillingBatchItem $item): RedirectResponse

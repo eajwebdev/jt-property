@@ -1,6 +1,6 @@
 @php
     use App\Support\Money;
-    $logo = 'data:image/png;base64,'.base64_encode((string) @file_get_contents(resource_path('img/mubarak-logo-horizontal-pdf.png')));
+    $logo = 'data:image/webp;base64,'.base64_encode((string) @file_get_contents(resource_path('img/mubarak-logo-horizontal-pdf.webp')));
 @endphp
 <!doctype html>
 <html lang="en">

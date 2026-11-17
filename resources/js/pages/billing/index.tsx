@@ -423,14 +423,14 @@ export default function BillingIndex({ year, month, filters, properties, rows, c
                         <Button
                             asChild
                             variant="outline"
-                            title={`All ${billed.length} billing statements of ${months[month - 1]} in one PDF, one per page`}
+                            title={`Opens all ${billed.length} statements of ${months[month - 1]}, one per page, ready to print or Save as PDF`}
                         >
                             <a
-                                href={route('billing.month-statements', { year, month, property_id: filters.property_id ?? undefined })}
+                                href={route('billing.month-statements.print', { year, month, property_id: filters.property_id ?? undefined })}
                                 target="_blank"
                                 rel="noopener noreferrer"
                             >
-                                <Printer /> All statements ({billed.length})
+                                <Printer /> Print all statements ({billed.length})
                             </a>
                         </Button>
                     )}
