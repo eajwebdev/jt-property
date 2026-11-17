@@ -179,7 +179,8 @@ class ModelsTest extends TestCase
         $this->assertCheckFails(fn () => RentalAgreement::factory()->create(['cycle_start_day' => 29]));
         $this->assertCheckFails(fn () => RentalAgreement::factory()->create(['issue_lead_days' => 32]));
         $this->assertCheckFails(fn () => RentalAgreement::factory()->create(['end_date' => '2025-12-31']));
-        $this->assertCheckFails(fn () => RentRate::factory()->create(['rent_cents' => 0]));
+        $this->assertCheckFails(fn () => RentRate::factory()->create(['rent_cents' => -1]));
+        RentRate::factory()->create(['rent_cents' => 0]); // a free stay (₱0 rent) is allowed
         $this->assertCheckFails(fn () => SecurityDeposit::factory()->create(['amount_cents' => 0]));
         $this->assertCheckFails(fn () => Occupancy::factory()->create(['move_out_date' => '2025-12-31']));
     }

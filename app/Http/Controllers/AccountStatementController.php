@@ -22,8 +22,13 @@ class AccountStatementController extends Controller
     {
         abort_unless($request->user()->canAccessProperty($account->property_id), 403);
         [$from, $to] = $this->dates($request);
-        $account->load(['payer:id,full_name,email', 'property:id,name']);
+        $account->load(['payer:id,full_name,email', 'property:id,name', 'agreements.unit:id,code,building', 'agreements.bed:id,label']);
         $statement = $composer->forPeriod($account, Carbon::parse($from), Carbon::parse($to));
+        $today = today()->toDateString();
+        // Where the boarder stays now (or stayed last), for the header.
+        $rooms = $account->agreements->filter(fn ($a) => $a->end_date === null || $a->end_date->toDateString() >= $today);
+        $rooms = ($rooms->isNotEmpty() ? $rooms : $account->agreements->sortByDesc('start_date')->take(1))
+            ->map(fn ($a) => $a->unit->label.($a->bed ? ' · '.$a->bed->label : ''))->values()->all();
 
         // Every payment on this account (all dates), newest first, each with its receipt.
         $payments = Payment::where('billing_account_id', $account->id)->orderByDesc('paid_on')->orderByDesc('id')
@@ -46,7 +51,12 @@ class AccountStatementController extends Controller
             'account' => [
                 'id' => $account->id, 'number' => $account->account_no, 'tenant' => $account->payer->full_name,
                 'tenant_id' => $account->payer_tenant_id, 'email' => $account->payer->email, 'property' => $account->property->name,
+                'rooms' => $rooms, 'status' => $account->status->value,
             ],
+            // For "All time": the first day anything was posted on the account.
+            'first_date' => LedgerEntry::where('billing_account_id', $account->id)->min('effective_date')
+                ? Carbon::parse(LedgerEntry::where('billing_account_id', $account->id)->min('effective_date'))->toDateString()
+                : $from,
             'from' => $from, 'to' => $to,
             'statement' => ['opening_cents' => $statement->openingCents, 'rows' => $statement->rows, 'closing_cents' => $statement->closingCents],
             'payments' => $payments,
@@ -58,7 +68,7 @@ class AccountStatementController extends Controller
     {
         abort_unless($request->user()->canAccessProperty($account->property_id), 403);
         [$from, $to] = $this->dates($request);
-        $account->load(['payer:id,full_name', 'property:id,name']);
+        $account->load(['payer:id,full_name', 'property:id,name', 'agreements.unit:id,code,building']);
         $statement = $composer->forPeriod($account, Carbon::parse($from), Carbon::parse($to));
         $html = View::make('pdf.account-statement', compact('account', 'statement'))->render();
 

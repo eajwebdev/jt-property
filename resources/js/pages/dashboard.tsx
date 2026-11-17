@@ -1,4 +1,5 @@
 import { GroupedBarChart } from '@/components/charts/grouped-bar-chart';
+import { DashboardBillsTab, type BillPayments } from '@/components/dashboard-bills-tab';
 import { EmptyState } from '@/components/empty-state';
 import { PageHeader } from '@/components/page-header';
 import { methodLabels } from '@/components/record-payment-dialog';
@@ -28,11 +29,12 @@ import {
     LogOut,
     Plus,
     Receipt,
+    ReceiptText,
     TrendingUp,
     Wallet,
     Zap,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 interface Metrics {
     properties: number;
@@ -47,6 +49,9 @@ interface Metrics {
     coming_due_cents: number;
     pending_utilities: number;
     late_accounts: number;
+    /** Latest month with bills ("2026-10") and how many of its bills are not fully paid. */
+    bill_month: string | null;
+    bills_not_fully_paid: number;
 }
 interface Income {
     months: { month: string; label: string; billed_cents: number; collected_cents: number }[];
@@ -88,9 +93,10 @@ interface Props {
     income?: Income;
     late?: Late;
     occupancy?: Occupancy;
+    bills?: BillPayments;
 }
 
-const TABS = ['overview', 'income', 'late', 'occupancy'] as const;
+const TABS = ['overview', 'bills', 'income', 'late', 'occupancy'] as const;
 type Tab = (typeof TABS)[number];
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Dashboard', href: '/dashboard' }];
 const percent = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
@@ -234,14 +240,14 @@ function TabLoading() {
     );
 }
 
-export default function Dashboard({ metrics, due, recentActivity, income, late, occupancy }: Props) {
+export default function Dashboard({ metrics, due, recentActivity, bills, income, late, occupancy }: Props) {
     const { auth } = usePage<SharedData>().props;
     const isOwner = (auth.user as { role?: string }).role === 'owner';
     const [tab, setTab] = useState<Tab>(() => {
         const requested = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null;
         return TABS.includes(requested as Tab) ? (requested as Tab) : 'overview';
     });
-    const loaded: Record<Tab, boolean> = { overview: true, income: !!income, late: !!late, occupancy: !!occupancy };
+    const loaded: Record<Tab, boolean> = { overview: true, bills: !!bills, income: !!income, late: !!late, occupancy: !!occupancy };
 
     // Load a tab's data the first time it is opened (and on a deep link like ?tab=late).
     const needsLoad = !loaded[tab];
@@ -298,6 +304,20 @@ export default function Dashboard({ metrics, due, recentActivity, income, late, 
                     <TabsList aria-label="Dashboard sections">
                         <TabsTrigger value="overview">
                             <LayoutGrid /> Overview
+                        </TabsTrigger>
+                        <TabsTrigger value="bills">
+                            <ReceiptText />{' '}
+                            {metrics.bill_month
+                                ? `${new Date(`${metrics.bill_month}-01T12:00:00`).toLocaleDateString('en-PH', { month: 'long' })} bills`
+                                : "This month's bills"}
+                            {metrics.bills_not_fully_paid > 0 && (
+                                <span
+                                    className="bg-destructive text-destructive-foreground rounded-full px-1.5 py-px font-mono text-[11px] leading-4 font-semibold"
+                                    title="Bills not fully paid"
+                                >
+                                    {metrics.bills_not_fully_paid}
+                                </span>
+                            )}
                         </TabsTrigger>
                         <TabsTrigger value="income">
                             <TrendingUp /> Income
@@ -451,6 +471,7 @@ export default function Dashboard({ metrics, due, recentActivity, income, late, 
                         </div>
                     </TabsContent>
 
+                    <TabsContent value="bills">{bills ? <DashboardBillsTab bills={bills} /> : <TabLoading />}</TabsContent>
                     <TabsContent value="income">{income ? <IncomeTab income={income} /> : <TabLoading />}</TabsContent>
                     <TabsContent value="late">{late ? <LateTab late={late} /> : <TabLoading />}</TabsContent>
                     <TabsContent value="occupancy">{occupancy ? <OccupancyTab occupancy={occupancy} /> : <TabLoading />}</TabsContent>

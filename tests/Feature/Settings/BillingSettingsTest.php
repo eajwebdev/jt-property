@@ -59,7 +59,7 @@ class BillingSettingsTest extends TestCase
         $this->assertSame([], Settings::get('payment_instructions'));
         $this->assertSame(0, Settings::get('late_fee_grace_days'));
         $this->assertSame('fallback', Settings::get('nope', 'fallback'));
-        $this->assertCount(15, Settings::all());
+        $this->assertCount(17, Settings::all()); // incl. the Statement of Accounts signature (soa_prepared_by, soa_prepared_by_title)
     }
 
     public function test_set_persists_clears_cache_and_audits_old_and_new(): void

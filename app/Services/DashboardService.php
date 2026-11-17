@@ -7,10 +7,12 @@ use App\Enums\UnitStatus;
 use App\Models\BillingAccount;
 use App\Models\Invoice;
 use App\Models\InvoiceLineItem;
+use App\Models\LedgerEntry;
 use App\Models\Occupancy;
 use App\Models\Payment;
 use App\Models\Property;
 use App\Models\Unit;
+use App\Services\Billing\PaymentService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +23,107 @@ use Illuminate\Support\Facades\DB;
  */
 class DashboardService
 {
+    /** The latest month that has bills (e.g. "2026-10"), or null when nothing is billed yet. */
+    public function latestBillMonth(?array $propertyIds): ?string
+    {
+        $start = Invoice::where('status', InvoiceStatus::Finalized)
+            ->when($propertyIds !== null, fn ($q) => $q->whereIn('property_id', $propertyIds))
+            ->max('period_start');
+
+        return $start ? Carbon::parse($start)->format('Y-m') : null;
+    }
+
+    /**
+     * "This month's bills": for every bill of the latest billed month, how much of it is paid.
+     * unpaid = nothing paid on it · partial = part paid · paid = paid in full · advance = paid in full and the account
+     * has credit left (paid ahead). A bill still owing after its due date is overdue. Unpaid rows come first.
+     *
+     * @return array{month: ?string, due_date: ?string, counts: array<string, int>, billed_cents: int, collected_cents: int, unpaid_cents: int, rows: list<array<string, mixed>>}
+     */
+    public function billPayments(?array $propertyIds): array
+    {
+        $empty = ['month' => null, 'due_date' => null, 'counts' => ['unpaid' => 0, 'partial' => 0, 'paid' => 0, 'advance' => 0], 'billed_cents' => 0, 'collected_cents' => 0, 'unpaid_cents' => 0, 'rows' => []];
+        $month = $this->latestBillMonth($propertyIds);
+        if ($month === null) {
+            return $empty;
+        }
+
+        $invoices = Invoice::where('status', InvoiceStatus::Finalized)
+            ->when($propertyIds !== null, fn ($q) => $q->whereIn('property_id', $propertyIds))
+            ->whereDate('period_start', '>=', $month.'-01')->whereDate('period_start', '<=', Carbon::parse($month.'-01')->endOfMonth()->toDateString())
+            // Nothing to collect on a ₱0 bill (free stay) or a credit-only bill: not listed.
+            ->where('current_charges_cents', '>', 0)
+            ->with(['billingAccount.payer:id,full_name,email', 'rentalAgreement.unit:id,code,building', 'rentalAgreement.bed:id,label', 'property:id,name'])
+            ->get();
+        $accountIds = $invoices->pluck('billing_account_id')->unique()->values()->all();
+        // What is still unpaid on each bill (bills not listed here are paid in full).
+        $open = app(PaymentService::class)->openDebits($accountIds)->whereNotNull('invoice_id')->groupBy('invoice_id')->map->sum('remaining_cents');
+        $balances = LedgerEntry::whereIn('billing_account_id', $accountIds)->selectRaw('billing_account_id, SUM(amount_cents) as cents')
+            ->groupBy('billing_account_id')->pluck('cents', 'billing_account_id');
+        $lastPaid = Payment::whereIn('billing_account_id', $accountIds)->where('status', 'approved')
+            ->selectRaw('billing_account_id, MAX(paid_on) as paid_on')->groupBy('billing_account_id')->pluck('paid_on', 'billing_account_id');
+        $today = today()->toDateString();
+
+        $rows = $invoices->map(function (Invoice $invoice) use ($open, $balances, $lastPaid, $today) {
+            $amount = max(0, $invoice->current_charges_cents);
+            $remaining = min($amount, (int) ($open[$invoice->id] ?? 0));
+            $balance = (int) ($balances[$invoice->billing_account_id] ?? 0);
+            $status = match (true) {
+                $remaining <= 0 && $balance < 0 => 'advance',
+                $remaining <= 0 => 'paid',
+                $remaining < $amount => 'partial',
+                default => 'unpaid',
+            };
+            $agreement = $invoice->rentalAgreement;
+
+            return [
+                'invoice_id' => $invoice->id,
+                'number' => $invoice->number,
+                'account_id' => $invoice->billing_account_id,
+                'account_no' => $invoice->billingAccount->account_no,
+                'tenant' => $invoice->billingAccount->payer->full_name,
+                'email' => $invoice->billingAccount->payer->email,
+                'room' => $agreement->unit->label.($agreement->bed ? ' · '.$agreement->bed->label : ''),
+                'property' => $invoice->property->name,
+                'due_date' => $invoice->due_date->toDateString(),
+                'bill_cents' => $amount,
+                'paid_cents' => $amount - $remaining,
+                'remaining_cents' => $remaining,
+                'balance_cents' => $balance,
+                'status' => $status,
+                'overdue' => $remaining > 0 && $invoice->due_date->toDateString() < $today,
+                'last_paid_on' => isset($lastPaid[$invoice->billing_account_id]) ? Carbon::parse($lastPaid[$invoice->billing_account_id])->toDateString() : null,
+            ];
+        });
+
+        $order = ['unpaid' => 0, 'partial' => 1, 'paid' => 2, 'advance' => 3];
+        $rows = $rows->sortBy(fn ($r) => sprintf('%d|%s', $order[$r['status']], mb_strtolower($r['tenant'])))->values();
+
+        return [
+            'month' => $month,
+            'due_date' => $rows->min('due_date'),
+            'counts' => array_merge($empty['counts'], $rows->countBy('status')->all()),
+            'billed_cents' => (int) $rows->sum('bill_cents'),
+            'collected_cents' => (int) $rows->sum('paid_cents'),
+            'unpaid_cents' => (int) $rows->sum('remaining_cents'),
+            'rows' => $rows->all(),
+        ];
+    }
+
+    /** How many bills of the latest billed month are not fully paid (for the tab label). */
+    public function billsNotFullyPaid(?array $propertyIds, ?string $month, Collection $openDebits): int
+    {
+        if ($month === null) {
+            return 0;
+        }
+        $ids = Invoice::where('status', InvoiceStatus::Finalized)
+            ->when($propertyIds !== null, fn ($q) => $q->whereIn('property_id', $propertyIds))
+            ->whereDate('period_start', '>=', $month.'-01')->whereDate('period_start', '<=', Carbon::parse($month.'-01')->endOfMonth()->toDateString())
+            ->pluck('id');
+
+        return $openDebits->whereNotNull('invoice_id')->whereIn('invoice_id', $ids)->pluck('invoice_id')->unique()->count();
+    }
+
     /** Billed vs collected for the last 12 months, plus this month's split by method, property and charge type. */
     public function income(?array $propertyIds): array
     {

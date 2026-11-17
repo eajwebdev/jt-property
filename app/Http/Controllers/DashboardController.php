@@ -57,6 +57,9 @@ class DashboardController extends Controller
                 'overdue_cents' => array_sum(array_diff_key($report['totals'], ['current' => true])),
                 'coming_due_cents' => $comingDue,
                 'late_accounts' => $report['rows']->filter(fn (array $row) => $row['open_cents'] > 0 && $row['oldest_due'] !== null && $row['oldest_due'] < $today)->count(),
+                // "This month's bills" tab label: the latest billed month and how many of its bills are not fully paid.
+                'bill_month' => $billMonth = $dashboard->latestBillMonth($propertyIds),
+                'bills_not_fully_paid' => $dashboard->billsNotFullyPaid($propertyIds, $billMonth, $openDebits),
                 'pending_utilities' => UtilityBill::query()->where('status', 'draft')->whereBetween('bill_month', [$monthStart, $monthEnd])->whereHas('unit', fn ($query) => $query->when($propertyIds !== null, fn ($q) => $q->whereIn('property_id', $propertyIds)))->count(),
             ],
             'due' => $due,
@@ -64,6 +67,7 @@ class DashboardController extends Controller
             'income' => Inertia::optional(fn () => $dashboard->income($propertyIds)),
             'late' => Inertia::optional(fn () => $dashboard->late($openDebits, $propertyIds)),
             'occupancy' => Inertia::optional(fn () => $dashboard->occupancy($propertyIds)),
+            'bills' => Inertia::optional(fn () => $dashboard->billPayments($propertyIds)),
             'recentActivity' => ActivityLog::query()->with('user:id,name')
                 ->when($propertyIds !== null, fn ($query) => $query->where('user_id', $user->id))
                 ->latest('id')->limit(8)->get()->map(fn (ActivityLog $log) => [
